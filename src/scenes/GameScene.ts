@@ -598,6 +598,16 @@ export class GameScene
   }
 
   private resetState() {
+    this.resetPlayerState();
+    this.resetBattleState();
+    this.battleSystem.reset();
+    this.stageManager.reset();
+    this.uiManager.reset();
+    this.cardSystem.reset();
+    this.overlayManager.reset();
+  }
+
+  private resetPlayerState(): void {
     const rl = this.relicLevels;
     this.gold = rl.purse * 20;
     this.attackPower = this.baseAtk;
@@ -632,12 +642,8 @@ export class GameScene
     this.mpRegenAccum = 0;
     this.attackAccum = 0;
     this.autoAttackEnabled = false;
-    this.chargeTimers = [];
-    this.atkBuffActive = false;
-    this.invincible = false;
     this.gameOver = false;
     this.cardSelecting = false;
-    this.overlayManager.reset();
     this.waveXpAccum = 0;
     this.monsters = [];
     this.targetMonster = null;
@@ -653,6 +659,14 @@ export class GameScene
     this.achData = SaveManager.loadAchievements();
     this.potionUsedThisRun = false;
     this.bossHitThisRun = false;
+    this.totalKills = 0;
+    this.totalGoldEarned = 0;
+  }
+
+  private resetBattleState(): void {
+    this.chargeTimers = [];
+    this.atkBuffActive = false;
+    this.invincible = false;
     this.poisonTimer = undefined;
     this.skillSealed = false;
     this.skillSealTimer = undefined;
@@ -672,18 +686,12 @@ export class GameScene
     this.shadowCloneMult = 0;
     this.dotTimers = [];
     this.tempCritBonus = 0;
-    this.battleSystem.reset();
-    this.stageManager.reset();
     this.emergencyDefCd = 0;
     this.emergencyDefActive = false;
     this.mageBarrierActive = false;
     this.mageBarrierAbsorb = 0;
     this.roguePostDodgeActive = false;
     this.roguePostDodgeTimer = undefined;
-    this.totalKills = 0;
-    this.totalGoldEarned = 0;
-    this.uiManager.reset();
-    this.cardSystem.reset();
   }
 
   /* ---- delegated: UI / overlay / cards ---- */
@@ -1664,6 +1672,23 @@ export class GameScene
   private onAutoAttack(isAuto = true) {
     const t = this.targetMonster;
     if (this.gameOver || !t || t.isDead) return;
+
+    const { dmg, isCrit, color, size } = this.applyAutoAttackDamage(t, isAuto);
+    const dead = t.takeDamage(dmg);
+    const ox = Phaser.Math.Between(-20, 20),
+      oy = Phaser.Math.Between(-15, 0);
+    DamageText.show(this, t.x + ox, t.y - 40 + oy, dmg, color, size);
+
+    this.applyAutoAttackEffects(t, isCrit, ox, oy);
+    this.handleAutoAttackRewards(t, dead, isCrit, isAuto);
+  }
+
+  private applyAutoAttackDamage(
+    t: Monster,
+    isAuto: boolean,
+  ): { dmg: number; isCrit: boolean; color: string; size: string } {
+    void t;
+    void isAuto;
     let dmg = this.effectiveAtk;
     if (this.battleSystem.overdriveActive) dmg = Math.floor(dmg * 2);
     if (this.hasSynergy('berserker')) dmg += 5;
@@ -1686,10 +1711,6 @@ export class GameScene
       this.roguePostDodgeActive = false;
       this.stealthGuaranteeCrit = false;
     }
-    this.battleSystem.addOverdrive(isAuto ? 5 : 10);
-    if (isCrit) this.battleSystem.addOverdrive(20);
-    this.battleSystem.addComboHit();
-
     if (this.battleSystem.overdriveActive) {
       if (isCrit) {
         color = '#ff4444';
@@ -1699,12 +1720,10 @@ export class GameScene
         size = '36px';
       }
     }
+    return { dmg, isCrit, color, size };
+  }
 
-    const dead = t.takeDamage(dmg);
-    const ox = Phaser.Math.Between(-20, 20),
-      oy = Phaser.Math.Between(-15, 0);
-    DamageText.show(this, t.x + ox, t.y - 40 + oy, dmg, color, size);
-
+  private applyAutoAttackEffects(t: Monster, isCrit: boolean, ox: number, oy: number): void {
     if (isCrit && this.hasSynergy('death_touch')) {
       this.playerHp = Math.min(this.playerHp + 20, this.playerMaxHp);
       this.drawPlayerHpBar();
@@ -1736,7 +1755,7 @@ export class GameScene
         this.battleSystem.overdriveActive ? [0xffdd00, 0xffaa00] : undefined,
       );
     }
-    this.applyLifesteal(dmg);
+    this.applyLifesteal(this.effectiveAtk);
 
     if (
       this.battleSystem.overdriveActive &&
@@ -1750,6 +1769,17 @@ export class GameScene
       });
       DamageText.show(this, t.x, t.y - 85, 'STUN!', '#ffcc00', '16px');
     }
+  }
+
+  private handleAutoAttackRewards(
+    t: Monster,
+    dead: boolean,
+    isCrit: boolean,
+    isAuto: boolean,
+  ): void {
+    this.battleSystem.addOverdrive(isAuto ? 5 : 10);
+    if (isCrit) this.battleSystem.addOverdrive(20);
+    this.battleSystem.addComboHit();
 
     if (this.shadowCloneActive && this.shadowCloneMult > 0) {
       const cloneDmg = Math.floor(this.effectiveAtk * this.shadowCloneMult);
@@ -1788,17 +1818,8 @@ export class GameScene
     if (this.gameOver || this.cardSelecting || this.doorSelecting || alive.length === 0) return;
     if (this.monsterStunned || this.monsterFrozen) return;
     const attacker = Phaser.Math.RND.pick(alive);
-    const atkMult = attacker.isSub ? 0.5 : 1;
-    let monAtk = this.monsterAttackPower;
-    if (this.currentBossType !== 'none')
-      monAtk = Math.floor(monAtk * this.stageManager.bossRageMult);
-    if (this.monsterWeakened) monAtk = Math.floor(monAtk * (1 - this.monsterWeakenPct));
-    const madnessExtra = this.markCount('madness') * 2;
-    const rawDmg = Math.max(
-      1,
-      Math.floor(monAtk * atkMult * (1 - this.defenseRate)) + madnessExtra,
-    );
 
+    const dmg = this.calculateMonsterDamage(attacker);
     attacker.playAttackAnimation();
 
     if (this.invincible || this.stealthActive) {
@@ -1812,19 +1833,33 @@ export class GameScene
       return;
     }
 
-    const barrier = this.tryMageBarrier(rawDmg);
+    const barrier = this.tryMageBarrier(dmg);
     if (barrier.absorbed) return;
 
-    this.playerHp = Math.max(0, this.playerHp - rawDmg);
+    this.applyMonsterDamage(dmg);
+  }
+
+  private calculateMonsterDamage(attacker: Monster): number {
+    const atkMult = attacker.isSub ? 0.5 : 1;
+    let monAtk = this.monsterAttackPower;
+    if (this.currentBossType !== 'none')
+      monAtk = Math.floor(monAtk * this.stageManager.bossRageMult);
+    if (this.monsterWeakened) monAtk = Math.floor(monAtk * (1 - this.monsterWeakenPct));
+    const madnessExtra = this.markCount('madness') * 2;
+    return Math.max(1, Math.floor(monAtk * atkMult * (1 - this.defenseRate)) + madnessExtra);
+  }
+
+  private applyMonsterDamage(dmg: number): void {
+    this.playerHp = Math.max(0, this.playerHp - dmg);
     if (this.currentBossType !== 'none') this.bossHitThisRun = true;
     this.drawPlayerHpBar();
-    this.playHitEffect(rawDmg, this.currentBossType !== 'none');
+    this.playHitEffect(dmg, this.currentBossType !== 'none');
     this.battleSystem.addOverdrive(5);
 
-    this.tryWarriorBlock(rawDmg);
+    this.tryWarriorBlock(dmg);
 
     if (this.reflectActive && this.reflectPct > 0) {
-      const reflected = Math.floor(rawDmg * this.reflectPct);
+      const reflected = Math.floor(dmg * this.reflectPct);
       if (reflected > 0 && this.targetMonster && !this.targetMonster.isDead) {
         const dead = this.targetMonster.takeDamage(reflected);
         DamageText.show(
