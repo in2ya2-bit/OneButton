@@ -29,7 +29,6 @@ import { NARRATION, NarrationEntry } from '../data/narration';
 import {
   INIT_HP,
   INIT_ATK,
-  INIT_ATK_INTERVAL_MS,
   MIN_ATK_INTERVAL_MS,
   INIT_MP,
   MP_REGEN_PER_SEC,
@@ -37,15 +36,11 @@ import {
   MON_HP_GROWTH,
   MON_BASE_ATK,
   MON_ATK_GROWTH,
-  MON_ATK_INTERVAL_NORMAL,
-  MON_ATK_INTERVAL_MINI,
-  MON_ATK_INTERVAL_FINAL,
   SHOP_BTN,
   RELIC_BTN,
   HP_BAR,
   MP_BAR,
   XP_BAR,
-  MAIN_MON_POS,
   SUB_MON_POSITIONS,
   MAX_SLOTS,
   SLOT_W,
@@ -58,20 +53,24 @@ import {
   QSLOT_XS,
   MAX_POTION_STACK,
 } from '../config/constants';
-import type { CardDef, CardRarity, QuickSlotData } from '../types/index';
+import type {
+  AutoAtkCardDef,
+  CardDef,
+  CardRarity,
+  QuickSlotData,
+  SynergyDef,
+} from '../types/index';
 import {
   STAT_CARDS,
   POTION_DATA,
   SHOP_ITEMS,
-  DOOR_DEFS,
-  EVENTS,
   RARITY_COLORS,
   LEGENDARY_DESCS,
   SYNERGIES,
   AUTO_ATK_CARDS,
 } from '../config/cardData';
 import { BattleSystem, IBattleSceneContext } from '../systems/BattleSystem';
-import { StageManager } from '../systems/StageManager';
+import { StageManager, IStageSceneContext } from '../systems/StageManager';
 import { CardSystem } from '../systems/CardSystem';
 import { UIManager } from '../ui/UIManager';
 import { OverlayManager } from '../ui/OverlayManager';
@@ -102,11 +101,11 @@ function skillCdCalc(id: string, level: number, cdReduction: number): number {
 
 /* ================================================================ */
 
-export class GameScene extends Phaser.Scene implements IBattleSceneContext {
+export class GameScene extends Phaser.Scene implements IBattleSceneContext, IStageSceneContext {
   /* ---- systems ---- */
 
-  private battleSystem!: BattleSystem;
-  private stageManager!: StageManager;
+  public battleSystem!: BattleSystem;
+  public stageManager!: StageManager;
   private cardSystem!: CardSystem;
   private uiManager!: UIManager;
   private overlayManager!: OverlayManager;
@@ -114,34 +113,34 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
   /* ---- state ---- */
 
   public gold = 0;
-  private attackPower = INIT_ATK;
-  private stage = 1;
-  private highestStageCleared = 0;
-  private regionBossesKilled = 0;
+  public attackPower = INIT_ATK;
+  public stage = 1;
+  public highestStageCleared = 0;
+  public regionBossesKilled = 0;
 
-  private level = 1;
+  public level = 1;
   private xp = 0;
   private xpToNext = 18;
-  private pendingLevelUps = 0;
+  public pendingLevelUps = 0;
   private cardLevels: Record<string, number> = {};
 
   private equippedSkills: string[] = [];
   private skillLevels: Record<string, number> = {};
   private quickSlots: QuickSlotData[] = [];
 
-  private playerHp = INIT_HP;
-  private playerMaxHp = INIT_HP;
+  public playerHp = INIT_HP;
+  public playerMaxHp = INIT_HP;
   private playerMp = INIT_MP;
   private playerMaxMp = INIT_MP;
   private mpRegenAccum = 0;
-  private attackAccum = 0;
+  public attackAccum = 0;
   private autoAttackEnabled = false;
   private autoAttackBadge?: Phaser.GameObjects.Container;
-  private chargeTimers: Phaser.Time.TimerEvent[] = [];
+  public chargeTimers: Phaser.Time.TimerEvent[] = [];
 
   private atkBuffActive = false;
   private atkBuffTimer?: Phaser.Time.TimerEvent;
-  private invincible = false;
+  public invincible = false;
   private invincibleTimer?: Phaser.Time.TimerEvent;
 
   /* skill-effect state */
@@ -168,57 +167,37 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
   private relicOpen = false;
   public monsters: Monster[] = [];
   public targetMonster: Monster | null = null;
-  private waveXpAccum = 0;
-  private poisonTimer?: Phaser.Time.TimerEvent;
+  public waveXpAccum = 0;
+  public poisonTimer?: Phaser.Time.TimerEvent;
 
-  public currentBossType: 'none' | 'mini' | 'final' = 'none';
-  private bossSpecialTimer?: Phaser.Time.TimerEvent;
-  private bossRageTimer?: Phaser.Time.TimerEvent;
-  private bossRageLevel = 0;
-  private monsterAttackTimer?: Phaser.Time.TimerEvent;
-  private totalKills = 0;
-  private totalGoldEarned = 0;
+  public totalKills = 0;
+  public totalGoldEarned = 0;
 
-  private waveTotal = 0;
-  private waveCurrent = 0;
-  private stageType: 'combat' | 'elite' | 'boss' | 'shop' | 'rest' | 'event' = 'combat';
-  public doorSelecting = false;
-  private isEliteStage = false;
-  private nextCombatCursed = false;
-  private tempEventAtkBuff = 0;
   private hasRevived = false;
   private relicPanel!: RelicPanel;
   private waveText!: Phaser.GameObjects.Text;
-  private shopFromDoor = false;
-  private restCardPending = false;
-  private pendingStageClear = false;
-  private pendingStageClearBoss = false;
-  private waveClearing = false;
+  public shopFromDoor = false;
+  public restCardPending = false;
   private waitingFirstCard = false;
   public pauseOpen = false;
   private cardRarityBonus: Record<string, number> = {};
-  private legendaryEffects: Record<string, boolean> = {};
+  public legendaryEffects: Record<string, boolean> = {};
   private activeSynergies: string[] = [];
   private mageStartRare = false;
   private achData!: AchievementSave;
   private potionUsedThisRun = false;
-  private bossHitThisRun = false;
+  public bossHitThisRun = false;
   private cheatInvincible = false;
   private cheatAtk = false;
 
-  private deathMarks: MarkId[] = [];
-  private soulData: SoulData | null = null;
-  private soulRecovered = false;
-  private skillSealed = false;
-  private skillSealTimer?: Phaser.Time.TimerEvent;
-
-  private bossPatternTimer?: Phaser.Time.TimerEvent;
-  private bossPatternWarning?: Phaser.GameObjects.Text;
-  private bossDefenseReduction = 0;
-  private bossDefenseTimer?: Phaser.Time.TimerEvent;
+  public deathMarks: MarkId[] = [];
+  public soulData: SoulData | null = null;
+  public soulRecovered = false;
+  public skillSealed = false;
+  public skillSealTimer?: Phaser.Time.TimerEvent;
 
   /* response system state */
-  private emergencyDefCd = 0;
+  public emergencyDefCd = 0;
   private emergencyDefActive = false;
   private mageBarrierActive = false;
   private mageBarrierAbsorb = 0;
@@ -254,13 +233,12 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
   private qSlotLvTexts: Phaser.GameObjects.Text[] = [];
   private qSlotCounts: Phaser.GameObjects.Text[] = [];
 
-  private bgGraphics!: Phaser.GameObjects.Graphics;
-  private bossBgOverlay?: Phaser.GameObjects.Graphics;
+  public bgGraphics!: Phaser.GameObjects.Graphics;
   private atkGaugeFill!: Phaser.GameObjects.Graphics;
   private buffBarContainer?: Phaser.GameObjects.Container;
   private tooltipBg?: Phaser.GameObjects.Graphics;
   private tooltipText?: Phaser.GameObjects.Text;
-  private overlayElements: Phaser.GameObjects.GameObject[] = [];
+  public overlayElements: Phaser.GameObjects.GameObject[] = [];
   private pauseElements: Phaser.GameObjects.GameObject[] = [];
   private synergyContainer?: Phaser.GameObjects.Container;
 
@@ -268,9 +246,9 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
   private overdriveGaugeBg?: Phaser.GameObjects.Graphics;
   public overdriveGaugeFill?: Phaser.GameObjects.Graphics;
   public overdriveGaugeText?: Phaser.GameObjects.Text;
-  private emergencyDefBtn?: Phaser.GameObjects.Container;
+  public emergencyDefBtn?: Phaser.GameObjects.Container;
   private emergencyDefCdText?: Phaser.GameObjects.Text;
-  private parryHintText?: Phaser.GameObjects.Text;
+  public parryHintText?: Phaser.GameObjects.Text;
   private parryCdOverlay?: Phaser.GameObjects.Text;
   private narrationBg?: Phaser.GameObjects.Graphics;
   private narrationText?: Phaser.GameObjects.Text;
@@ -279,8 +257,35 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
   private narrationTimer?: Phaser.Time.TimerEvent;
   private narrationTypingTimer?: Phaser.Time.TimerEvent;
 
-  private startRegion = 1;
+  public startRegion = 1;
   public selectedClass: ClassDef = CLASSES[0];
+
+  public get currentBossType(): 'none' | 'mini' | 'final' {
+    return this.stageManager.currentBossType;
+  }
+
+  public get doorSelecting(): boolean {
+    return this.stageManager.doorSelecting;
+  }
+  public set doorSelecting(v: boolean) {
+    this.stageManager.doorSelecting = v;
+  }
+
+  public get stageType(): 'combat' | 'elite' | 'boss' | 'shop' | 'rest' | 'event' {
+    return this.stageManager.stageType;
+  }
+
+  public get isEliteStage(): boolean {
+    return this.stageManager.isEliteStage;
+  }
+
+  public get nextCombatCursed(): boolean {
+    return this.stageManager.nextCombatCursed;
+  }
+
+  public get tempEventAtkBuff(): number {
+    return this.stageManager.tempEventAtkBuff;
+  }
 
   constructor() {
     super({ key: 'GameScene' });
@@ -303,7 +308,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.registry.set('relicPoints', v);
   }
 
-  private get relicLevels(): Record<string, number> {
+  public get relicLevels(): Record<string, number> {
     const stored = this.registry.get('relicLevels');
     return { ...DEFAULT_RELIC_LEVELS, ...(stored ?? {}) };
   }
@@ -322,13 +327,13 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
 
   /* ---- computed: region ---- */
 
-  private get currentRegion(): number {
+  public get currentRegion(): number {
     return Math.min(REGIONS.length, Math.ceil(this.stage / 20));
   }
   public get localStage(): number {
     return ((this.stage - 1) % 20) + 1;
   }
-  private get regionDef(): RegionDef {
+  public get regionDef(): RegionDef {
     return REGIONS[Math.min(REGIONS.length - 1, this.currentRegion - 1)];
   }
 
@@ -401,13 +406,13 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     if (this.selectedClass.id === 'rogue') m += 0.5;
     return m;
   }
-  private get defenseRate(): number {
+  public get defenseRate(): number {
     let d = this.gcv('def') / 100 + this.relicLevels.shield * 0.05;
     if (this.hasSynergy('iron_guard')) d += 0.1;
     if (this.selectedClass.id === 'warrior') d += 0.15;
     d += this.shieldDmgReduce;
     d -= this.markCount('fear') * 0.1;
-    d -= this.bossDefenseReduction;
+    d -= this.stageManager.bossDefenseReduction;
     return Math.min(Math.max(d, -0.5), 0.9);
   }
   private get lifestealRate(): number {
@@ -431,7 +436,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     return 1 + this.relicLevels.sage * 0.15;
   }
 
-  private get goldDropMultiplier(): number {
+  public get goldDropMultiplier(): number {
     return (
       this.goldMultiplier *
       (1 + this.relicLevels.gold_touch * 0.2) *
@@ -466,7 +471,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     return r;
   }
 
-  private get monsterAttackPower(): number {
+  public get monsterAttackPower(): number {
     const r = this.regionDef;
     let base = Math.floor(MON_BASE_ATK * Math.pow(MON_ATK_GROWTH, this.stage - 1) * r.atkMult);
     if (this.currentBossType === 'mini') base = Math.floor(base * 2.5);
@@ -502,7 +507,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     }
     this.loadingRun = false;
 
-    this.createBackground();
+    this.stageManager.createBackground();
     this.createUI();
     this.createXpBar();
     this.createPlayerHpBar();
@@ -524,7 +529,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.input.keyboard?.on('keydown-ENTER', () => this.battleSystem.tryActivateOverdrive());
     this.input.keyboard?.on('keydown-TAB', (e: KeyboardEvent) => {
       e.preventDefault();
-      this.cycleTarget();
+      this.stageManager.cycleTarget();
     });
     this.input.keyboard?.on('keydown-ESC', () => this.togglePauseMenu());
     this.input.keyboard?.on('keydown-F9', () => this.toggleCheatInvincible());
@@ -544,7 +549,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
       this.drawMpBar();
       this.drawXpBar();
       this.updateUI();
-      this.startStage();
+      this.stageManager.startStage();
     } else {
       SaveManager.deleteRun();
       const perm = SaveManager.loadPermanent();
@@ -557,9 +562,9 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
       this.waitingFirstCard = true;
 
       const showGuidesThenCard = () => {
-        this.showBasicAtkTutorial(!this.autoAttackEnabled, () => {
+        this.stageManager.showBasicAtkTutorial(!this.autoAttackEnabled, () => {
           this.battleSystem.parryTutorialShown = true;
-          this.showParryTutorial();
+          this.stageManager.showParryTutorial();
           this.pendingLevelUps = 1;
           this.cardSelecting = true;
           this.time.delayedCall(500, () => this.showCardSelection(true));
@@ -676,22 +681,12 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.cardSelecting = false;
     this.shopOpen = false;
     this.relicOpen = false;
-    this.waveTotal = 0;
-    this.waveCurrent = 0;
     this.waveXpAccum = 0;
     this.monsters = [];
     this.targetMonster = null;
-    this.stageType = 'combat';
-    this.doorSelecting = false;
-    this.isEliteStage = false;
-    this.nextCombatCursed = false;
-    this.tempEventAtkBuff = 0;
     this.hasRevived = false;
     this.shopFromDoor = false;
     this.restCardPending = false;
-    this.pendingStageClear = false;
-    this.pendingStageClearBoss = false;
-    this.waveClearing = false;
     this.pauseOpen = false;
     this.waitingFirstCard = false;
     this.cardRarityBonus = {};
@@ -702,16 +697,8 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.potionUsedThisRun = false;
     this.bossHitThisRun = false;
     this.poisonTimer = undefined;
-    this.bossSpecialTimer = undefined;
-    this.bossRageTimer = undefined;
-    this.bossRageLevel = 0;
-    this.bossPatternTimer = undefined;
-    this.bossPatternWarning = undefined;
-    this.bossDefenseReduction = 0;
-    this.bossDefenseTimer = undefined;
     this.skillSealed = false;
     this.skillSealTimer = undefined;
-    this.monsterAttackTimer = undefined;
     this.stealthActive = false;
     this.stealthGuaranteeCrit = false;
     this.reflectActive = false;
@@ -729,8 +716,8 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.dotTimers = [];
     this.tempCritBonus = 0;
     this.mpWarningShown = false;
-    this.currentBossType = 'none';
     this.battleSystem.reset();
+    this.stageManager.reset();
     this.emergencyDefCd = 0;
     this.emergencyDefActive = false;
     this.mageBarrierActive = false;
@@ -745,58 +732,8 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.qSlotIcons = [];
     this.qSlotLvTexts = [];
     this.qSlotCounts = [];
-    this.bossBgOverlay = undefined;
     this.overlayElements = [];
     this.pauseElements = [];
-  }
-
-  /* ================================================================
-     BACKGROUND
-     ================================================================ */
-
-  private createBackground() {
-    this.bgGraphics = this.add.graphics();
-    this.drawRegionBackground();
-  }
-
-  private drawRegionBackground() {
-    const r = this.regionDef;
-    this.bgGraphics.clear();
-    this.bgGraphics.fillGradientStyle(r.bgTop, r.bgTop, r.bgBot, r.bgBot, 1, 1, 1, 1);
-    this.bgGraphics.fillRect(0, 0, 800, 600);
-    this.bgGraphics.fillStyle(r.panelColor, 0.25);
-    this.bgGraphics.fillRect(0, 430, 800, 170);
-    this.bgGraphics.lineStyle(1, 0x1a5276, 0.4);
-    this.bgGraphics.lineBetween(0, 430, 800, 430);
-    this.bgGraphics.fillStyle(0xffffff, 0.04);
-    this.bgGraphics.fillCircle(400, 300, 160);
-    this.bgGraphics.fillStyle(0xffffff, 0.03);
-    this.bgGraphics.fillCircle(400, 300, 120);
-  }
-
-  private showBossBackground(isFinal: boolean) {
-    this.hideBossBackground();
-    this.bossBgOverlay = this.add.graphics().setDepth(1);
-    this.bossBgOverlay.fillStyle(isFinal ? 0x4a0000 : 0x3a1500, 0.35);
-    this.bossBgOverlay.fillRect(0, 0, 800, 600);
-    const bc = isFinal ? 0xff0000 : 0xff6600;
-    this.bossBgOverlay.lineStyle(4, bc, 0.45);
-    this.bossBgOverlay.strokeRect(2, 2, 796, 596);
-    this.bossBgOverlay.lineStyle(2, bc, 0.2);
-    this.bossBgOverlay.strokeRect(8, 8, 784, 584);
-    this.tweens.add({
-      targets: this.bossBgOverlay,
-      alpha: 0.6,
-      duration: 800,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-  }
-
-  private hideBossBackground() {
-    this.bossBgOverlay?.destroy();
-    this.bossBgOverlay = undefined;
   }
 
   /* ================================================================
@@ -1044,7 +981,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.drawMpBar();
   }
 
-  private drawPlayerHpBar() {
+  public drawPlayerHpBar() {
     const { x, y, w, h } = HP_BAR;
     const ratio = Phaser.Math.Clamp(this.playerHp / this.playerMaxHp, 0, 1);
     const fw = w * ratio;
@@ -1754,9 +1691,9 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
   public updateParryCdDisplay() {
     if (!this.parryCdOverlay) return;
     if (this.battleSystem.parryCd > 0) {
-      this.parryCdOverlay.setText(`패링 쿨타임 ${Math.ceil(this.battleSystem.parryCd)}s`).setColor(
-        '#886644',
-      );
+      this.parryCdOverlay
+        .setText(`패링 쿨타임 ${Math.ceil(this.battleSystem.parryCd)}s`)
+        .setColor('#886644');
     } else {
       this.parryCdOverlay.setText('').setColor('#aa8844');
     }
@@ -1766,7 +1703,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
      NARRATION SYSTEM
      ================================================================ */
 
-  private showNarration(entry: NarrationEntry, onDone?: () => void) {
+  public showNarration(entry: NarrationEntry, onDone?: () => void) {
     this.dismissNarration();
     this.narrationActive = true;
 
@@ -1876,7 +1813,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.narrationSpeaker = undefined;
   }
 
-  private tryParryBossPattern(incomingDmg: number): boolean {
+  public tryParryBossPattern(incomingDmg: number): boolean {
     if (!this.battleSystem.parryWindowOpen || !this.battleSystem.parryReady) return false;
     const elapsed = Date.now() - this.battleSystem.parryWindowOpenTime;
     const isPerfect = elapsed <= this.battleSystem.getPerfectWindow();
@@ -1934,7 +1871,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
 
   /* ---- Class-specific responses ---- */
 
-  private tryWarriorBlock(incomingDmg: number): boolean {
+  public tryWarriorBlock(incomingDmg: number): boolean {
     if (this.selectedClass.id !== 'warrior') return false;
     const shieldSkill = this.equippedSkills.find(s => s === 'w_shield_up');
     if (!shieldSkill) return false;
@@ -1957,7 +1894,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     return true;
   }
 
-  private tryMageBarrier(incomingDmg: number): { absorbed: boolean; dmg: number } {
+  public tryMageBarrier(incomingDmg: number): { absorbed: boolean; dmg: number } {
     if (!this.mageBarrierActive) return { absorbed: false, dmg: incomingDmg };
     this.mageBarrierActive = false;
     const reflectDmg = Math.floor(incomingDmg * 0.3);
@@ -2211,7 +2148,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.shopOpen ? this.closeOverlay() : this.openShop();
   }
 
-  private openShop() {
+  public openShop() {
     if (this.relicPanel?.isOpen) this.relicPanel.close();
     if (this.relicOpen) this.closeOverlay();
     this.shopOpen = true;
@@ -2793,19 +2730,23 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     switch (effect) {
       case 'stun':
         this.monsterStunned = true;
-        this.monsterAttackTimer?.paused && (this.monsterAttackTimer.paused = true);
+        this.stageManager.monsterAttackTimer?.paused &&
+          (this.stageManager.monsterAttackTimer.paused = true);
         this.time.delayedCall(duration * 1000, () => {
           this.monsterStunned = false;
-          if (this.monsterAttackTimer) this.monsterAttackTimer.paused = false;
+          if (this.stageManager.monsterAttackTimer)
+            this.stageManager.monsterAttackTimer.paused = false;
         });
         DamageText.show(this, 400, 160, '💫 스턴!', '#ffdd44', '20px');
         break;
       case 'freeze':
         this.monsterFrozen = true;
-        if (this.monsterAttackTimer) this.monsterAttackTimer.paused = true;
+        if (this.stageManager.monsterAttackTimer)
+          this.stageManager.monsterAttackTimer.paused = true;
         this.time.delayedCall(duration * 1000, () => {
           this.monsterFrozen = false;
-          if (this.monsterAttackTimer) this.monsterAttackTimer.paused = false;
+          if (this.stageManager.monsterAttackTimer)
+            this.stageManager.monsterAttackTimer.paused = false;
         });
         DamageText.show(this, 400, 160, '🧊 동결!', '#66ccff', '22px');
         break;
@@ -2943,7 +2884,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
      LEVEL-UP CARD SYSTEM
      ================================================================ */
 
-  private gainXp(amount: number) {
+  public gainXp(amount: number) {
     const adjusted = Math.floor(amount * this.xpMultiplier);
     const oldRatio = this.xp / this.xpToNext;
     const prevLevel = this.level;
@@ -3055,7 +2996,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.cameras.main.flash(250, 255, 210, 0);
   }
 
-  private showCardSelection(skillOnly = false) {
+  public showCardSelection(skillOnly = false) {
     if (this.cardSelecting && this.overlayElements.length > 0) return;
     this.cardSelecting = true;
     if (this.shopOpen) this.closeOverlay();
@@ -3997,17 +3938,17 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
       this.cardSelecting = false;
       if (this.waitingFirstCard) {
         this.waitingFirstCard = false;
-        this.startStage();
+        this.stageManager.startStage();
         return;
       }
-      if (this.pendingStageClear) {
-        this.pendingStageClear = false;
-        const boss = this.pendingStageClearBoss;
-        this.pendingStageClearBoss = false;
-        this.time.delayedCall(200, () => this.onStageClear(boss));
+      if (this.stageManager.pendingStageClear) {
+        this.stageManager.pendingStageClear = false;
+        const boss = this.stageManager.pendingStageClearBoss;
+        this.stageManager.pendingStageClearBoss = false;
+        this.time.delayedCall(200, () => this.stageManager.onStageClear(boss));
       } else if (this.restCardPending) {
         this.restCardPending = false;
-        this.advanceToNextStage();
+        this.stageManager.advanceToNextStage();
       }
     }
   }
@@ -4016,7 +3957,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
      OVERLAY MANAGEMENT
      ================================================================ */
 
-  private closeOverlay() {
+  public closeOverlay() {
     this.overlayElements.forEach(e => e.destroy());
     this.overlayElements = [];
     const wasDoor = this.shopFromDoor;
@@ -4024,765 +3965,52 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.relicOpen = false;
     this.shopFromDoor = false;
     if (wasDoor) {
-      this.time.delayedCall(100, () => this.advanceToNextStage());
+      this.time.delayedCall(100, () => this.stageManager.advanceToNextStage());
     }
   }
 
-  private getWaveCount(): number {
-    if (this.currentBossType !== 'none') return 1;
-    const ls = this.localStage;
-    if (ls <= 3) return 3;
-    if (ls <= 7) return 4;
-    if (ls <= 9) return 5;
-    if (ls <= 15) return 4 + (Math.random() < 0.5 ? 1 : 0);
-    return 5 + (Math.random() < 0.5 ? 1 : 0);
-  }
-
-  private startStage() {
-    if (!this.soulRecovered) this.checkSoulRecovery();
-    const ls = this.localStage;
-    if (ls === 10 || ls === 20) {
-      this.stageType = 'boss';
-    }
-
-    switch (this.stageType) {
-      case 'combat':
-      case 'elite':
-      case 'boss':
-        this.isEliteStage = this.stageType === 'elite';
-        this.waveTotal = this.stageType === 'boss' ? 1 : this.getWaveCount();
-        this.waveCurrent = 0;
-        this.spawnNextWave();
-        break;
-      case 'shop':
-        this.openShopFromDoor();
-        break;
-      case 'rest':
-        this.showRestScreen();
-        break;
-      case 'event':
-        this.showEventScreen();
-        break;
-    }
-  }
-
-  private spawnNextWave() {
-    this.waveClearing = false;
-    this.waveCurrent++;
-    this.updateUI();
-    this.spawnMonster();
-
-    if (this.pendingLevelUps > 0 && this.cardSelecting) {
-      this.time.delayedCall(500, () => this.showCardSelection(true));
-    }
-  }
-
-  private showBasicAtkTutorial(show: boolean, onDone?: () => void) {
-    if (!show) {
-      onDone?.();
-      return;
-    }
-    const bg = this.add.graphics().setDepth(400);
-    bg.fillStyle(0x000000, 0.7);
-    bg.fillRoundedRect(150, 230, 500, 50, 10);
-    bg.lineStyle(1, 0x66ccff, 0.6);
-    bg.strokeRoundedRect(150, 230, 500, 50, 10);
-    const txt = this.add
-      .text(
-        400,
-        245,
-        '[Q]키 또는 스킬 슬롯 클릭으로 기본 공격!\n레벨업 후 자동공격 카드를 획득하면 자동으로 공격합니다.',
-        {
-          fontSize: '11px',
-          color: '#88ccff',
-          fontFamily: 'Arial',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 3,
-          align: 'center',
-        },
-      )
-      .setOrigin(0.5, 0)
-      .setDepth(401);
-    this.time.delayedCall(3000, () => {
-      this.tweens.add({
-        targets: [bg, txt],
-        alpha: 0,
-        duration: 500,
-        onComplete: () => {
-          bg.destroy();
-          txt.destroy();
-          onDone?.();
-        },
-      });
-    });
-  }
-
-  private showParryTutorial() {
-    const bg = this.add.graphics().setDepth(400);
-    bg.fillStyle(0x000000, 0.7);
-    bg.fillRoundedRect(150, 360, 500, 60, 10);
-    bg.lineStyle(1, 0xffcc44, 0.6);
-    bg.strokeRoundedRect(150, 360, 500, 60, 10);
-    const txt = this.add
-      .text(400, 380, '몬스터의 원형 게이지가 초록색이 될 때\nSPACE / 우클릭으로 패링!', {
-        fontSize: '13px',
-        color: '#ffdd88',
-        fontFamily: 'Arial',
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 3,
-        align: 'center',
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(401);
-    this.time.delayedCall(5000, () => {
-      this.tweens.add({
-        targets: [bg, txt],
-        alpha: 0,
-        duration: 500,
-        onComplete: () => {
-          bg.destroy();
-          txt.destroy();
-        },
-      });
-    });
-  }
-
-  private onStageClear(wasBossForMemory: boolean) {
-    if (wasBossForMemory && this.relicLevels.memory > 0) {
-      const heal = this.relicLevels.memory * 20;
-      this.playerHp = Math.min(this.playerHp + heal, this.playerMaxHp);
-      this.drawPlayerHpBar();
-      DamageText.show(this, 400, 160, `+${heal} HP (전투의 기억)`, '#ff88cc', '18px');
-    }
-
-    this.nextCombatCursed = false;
-    this.tempEventAtkBuff = 0;
-
-    this.advanceToNextStage();
-  }
-
-  private advanceToNextStage() {
-    this.stage++;
-    this.highestStageCleared = Math.max(this.highestStageCleared, this.stage - 1);
-    this.pendingStageClear = false;
-    this.pendingStageClearBoss = false;
-    this.checkAchievements();
-    this.autoSave();
-    this.checkSoulRecovery();
-    const ls = this.localStage;
-
-    if (ls > 20) return;
-
-    if (this.legendaryEffects.hp && this.playerHp < this.playerMaxHp) {
-      this.playerHp = Math.min(this.playerHp + 5, this.playerMaxHp);
-      this.drawPlayerHpBar();
-      DamageText.show(this, 400, 180, '+5 HP', '#88ff88', '14px');
-    }
-
-    if (ls === 10 || ls === 20) {
-      this.stageType = 'boss';
-      this.startStage();
-    } else if (ls % 3 === 0 || ls === 9 || ls === 19) {
-      this.showDoorSelection();
-    } else {
-      this.stageType = 'combat';
-      this.startStage();
-    }
-  }
-
-  private showDoorSelection() {
-    this.doorSelecting = true;
-    const els = this.overlayElements;
-
-    const bg = this.add.graphics().setDepth(280).setAlpha(0);
-    bg.fillStyle(0x000000, 0.7);
-    bg.fillRect(0, 0, 800, 600);
-    els.push(bg);
-    this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
-
-    els.push(
-      this.add
-        .text(400, 80, '경로를 선택하세요', {
-          fontSize: '32px',
-          color: '#ddbb66',
-          fontFamily: 'Arial, sans-serif',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 5,
-        })
-        .setOrigin(0.5)
-        .setDepth(281),
-    );
-
-    els.push(
-      this.add
-        .text(
-          400,
-          115,
-          `${this.regionDef.icon} ${this.regionDef.name} - Stage ${this.localStage}/20`,
-          {
-            fontSize: '14px',
-            color: '#888899',
-            fontFamily: 'Arial',
-            stroke: '#000000',
-            strokeThickness: 2,
-          },
-        )
-        .setOrigin(0.5)
-        .setDepth(281),
-    );
-
-    const doors = this.generateDoors();
-    const doorW = 200,
-      doorH = 240,
-      gap = 30;
-    const totalW = doors.length * doorW + (doors.length - 1) * gap;
-    const startX = 400 - totalW / 2 + doorW / 2;
-
-    doors.forEach((door, i) => {
-      const dx = startX + i * (doorW + gap),
-        dy = 275;
-
-      const card = this.add.graphics().setDepth(281);
-      const drawCard = (hover: boolean) => {
-        card.clear();
-        card.fillStyle(hover ? 0x1a1a44 : 0x0e0e28, 0.95);
-        card.fillRoundedRect(dx - doorW / 2, dy - doorH / 2, doorW, doorH, 14);
-        card.lineStyle(hover ? 3 : 2, door.color, hover ? 1 : 0.6);
-        card.strokeRoundedRect(dx - doorW / 2, dy - doorH / 2, doorW, doorH, 14);
-        const tg = hover ? 0.5 : 0.3;
-        card.fillStyle(door.color, tg);
-        card.fillRoundedRect(dx - doorW / 2, dy - doorH / 2, doorW, 60, {
-          tl: 14,
-          tr: 14,
-          bl: 0,
-          br: 0,
+  public highlightResponseBtns(on: boolean) {
+    if (this.emergencyDefBtn) {
+      if (on && this.emergencyDefCd <= 0) {
+        this.tweens.add({
+          targets: this.emergencyDefBtn,
+          scaleX: 1.15,
+          scaleY: 1.15,
+          duration: 250,
+          yoyo: true,
+          repeat: -1,
+          key: 'edef_pulse',
         });
-      };
-      drawCard(false);
-      els.push(card);
-
-      els.push(
-        this.add
-          .text(dx, dy - 90, door.icon, { fontSize: '48px' })
-          .setOrigin(0.5)
-          .setDepth(282),
-      );
-      els.push(
-        this.add
-          .text(dx, dy - 30, door.name, {
-            fontSize: '22px',
-            color: '#ffffff',
-            fontFamily: 'Arial, sans-serif',
-            fontStyle: 'bold',
-            stroke: '#000000',
-            strokeThickness: 3,
-          })
-          .setOrigin(0.5)
-          .setDepth(282),
-      );
-      els.push(
-        this.add
-          .text(dx, dy + 10, door.desc, {
-            fontSize: '12px',
-            color: '#aabbcc',
-            fontFamily: 'Arial',
-            stroke: '#000000',
-            strokeThickness: 2,
-            wordWrap: { width: doorW - 20 },
-            align: 'center',
-          })
-          .setOrigin(0.5)
-          .setDepth(282),
-      );
-
-      if (door.type === 'elite') {
-        els.push(
-          this.add
-            .text(dx, dy + 50, '⚠ 위험!', {
-              fontSize: '14px',
-              color: '#ff6644',
-              fontFamily: 'Arial',
-              fontStyle: 'bold',
-              stroke: '#000000',
-              strokeThickness: 2,
-            })
-            .setOrigin(0.5)
-            .setDepth(282),
-        );
-      } else if (door.type === 'rest') {
-        els.push(
-          this.add
-            .text(dx, dy + 50, '♥ 안전', {
-              fontSize: '14px',
-              color: '#44ff88',
-              fontFamily: 'Arial',
-              fontStyle: 'bold',
-              stroke: '#000000',
-              strokeThickness: 2,
-            })
-            .setOrigin(0.5)
-            .setDepth(282),
-        );
-      }
-
-      els.push(
-        this.add
-          .text(dx, dy + doorH / 2 - 30, '클릭하여 선택', {
-            fontSize: '11px',
-            color: '#555577',
-            fontFamily: 'Arial',
-          })
-          .setOrigin(0.5)
-          .setDepth(282),
-      );
-
-      const z = this.add
-        .zone(dx, dy, doorW, doorH)
-        .setInteractive({ useHandCursor: true })
-        .setDepth(283);
-      z.on('pointerover', () => drawCard(true));
-      z.on('pointerout', () => drawCard(false));
-      z.on('pointerdown', () => this.selectDoor(door.type));
-      els.push(z);
-    });
-  }
-
-  private generateDoors(): DoorDef[] {
-    const ls = this.localStage;
-    const preBoss = ls === 9 || ls === 19;
-
-    const combatDoors = DOOR_DEFS.filter(d => d.type === 'combat' || d.type === 'elite');
-    const picks: DoorDef[] = [];
-    picks.push(Phaser.Math.RND.pick(combatDoors));
-
-    const remaining = DOOR_DEFS.filter(d => d.type !== picks[0].type);
-    picks.push(Phaser.Math.RND.pick(remaining));
-
-    const remaining2 = DOOR_DEFS.filter(d => !picks.find(p => p.type === d.type));
-    if (remaining2.length > 0) {
-      picks.push(Phaser.Math.RND.pick(remaining2));
-    }
-
-    if (preBoss && !picks.find(d => d.type === 'rest')) {
-      const restDoor = DOOR_DEFS.find(d => d.type === 'rest')!;
-      picks[picks.length - 1] = restDoor;
-    }
-
-    return Phaser.Utils.Array.Shuffle(picks);
-  }
-
-  private selectDoor(type: string) {
-    this.doorSelecting = false;
-    this.pendingLevelUps = 0;
-    this.pendingStageClear = false;
-    this.pendingStageClearBoss = false;
-    this.cardSelecting = false;
-    this.closeOverlay();
-    this.stageType = type as 'combat' | 'elite' | 'boss' | 'shop' | 'rest' | 'event';
-    this.autoSave();
-    this.startStage();
-  }
-
-  private openShopFromDoor() {
-    this.shopFromDoor = true;
-    this.openShop();
-  }
-
-  private showRestScreen() {
-    this.restCardPending = true;
-    const els = this.overlayElements;
-    const bg = this.add.graphics().setDepth(280).setAlpha(0);
-    bg.fillStyle(0x000000, 0.7);
-    bg.fillRect(0, 0, 800, 600);
-    els.push(bg);
-    this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
-
-    els.push(
-      this.add
-        .text(400, 150, '🔥 휴식', {
-          fontSize: '36px',
-          color: '#ffaa44',
-          fontFamily: 'Arial, sans-serif',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 5,
-        })
-        .setOrigin(0.5)
-        .setDepth(281),
-    );
-
-    const heal = Math.ceil(this.playerMaxHp * 0.3);
-    this.playerHp = Math.min(this.playerHp + heal, this.playerMaxHp);
-    this.drawPlayerHpBar();
-
-    els.push(
-      this.add
-        .text(400, 210, `HP ${heal} 회복!`, {
-          fontSize: '22px',
-          color: '#44ff88',
-          fontFamily: 'Arial',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 3,
-        })
-        .setOrigin(0.5)
-        .setDepth(281),
-    );
-
-    els.push(
-      this.add
-        .text(400, 260, '카드를 강화하세요', {
-          fontSize: '16px',
-          color: '#aabbcc',
-          fontFamily: 'Arial',
-          stroke: '#000000',
-          strokeThickness: 2,
-        })
-        .setOrigin(0.5)
-        .setDepth(281),
-    );
-
-    const btnG = this.add.graphics().setDepth(281);
-    const bx = 400,
-      by = 500,
-      bw = 200,
-      bh = 48;
-    const drawBtn = (hover: boolean) => {
-      btnG.clear();
-      btnG.fillStyle(hover ? 0x446644 : 0x334433, 1);
-      btnG.fillRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 12);
-      btnG.lineStyle(2, hover ? 0x66cc88 : 0x44aa66, 1);
-      btnG.strokeRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 12);
-    };
-    drawBtn(false);
-    els.push(btnG);
-    els.push(
-      this.add
-        .text(bx, by, '계속하기', {
-          fontSize: '18px',
-          color: '#ffffff',
-          fontFamily: 'Arial',
-          fontStyle: 'bold',
-        })
-        .setOrigin(0.5)
-        .setDepth(282),
-    );
-    const z = this.add.zone(bx, by, bw, bh).setInteractive({ useHandCursor: true }).setDepth(283);
-    z.on('pointerover', () => drawBtn(true));
-    z.on('pointerout', () => drawBtn(false));
-    z.on('pointerdown', () => {
-      this.closeOverlay();
-      this.pendingLevelUps++;
-      this.cardSelecting = true;
-      this.showCardSelection();
-    });
-    els.push(z);
-  }
-
-  private showEventScreen() {
-    const evt = Phaser.Math.RND.pick(EVENTS);
-    const els = this.overlayElements;
-
-    const bg = this.add.graphics().setDepth(280).setAlpha(0);
-    bg.fillStyle(0x000000, 0.7);
-    bg.fillRect(0, 0, 800, 600);
-    els.push(bg);
-    this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
-
-    els.push(this.add.text(400, 130, evt.icon, { fontSize: '60px' }).setOrigin(0.5).setDepth(281));
-    els.push(
-      this.add
-        .text(400, 190, evt.name, {
-          fontSize: '28px',
-          color: '#ddbb66',
-          fontFamily: 'Arial, sans-serif',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 4,
-        })
-        .setOrigin(0.5)
-        .setDepth(281),
-    );
-    els.push(
-      this.add
-        .text(400, 230, evt.desc, {
-          fontSize: '16px',
-          color: '#aabbcc',
-          fontFamily: 'Arial',
-          stroke: '#000000',
-          strokeThickness: 2,
-        })
-        .setOrigin(0.5)
-        .setDepth(281),
-    );
-
-    this.applyEvent(evt);
-
-    els.push(
-      this.add
-        .text(400, 300, evt.effect, {
-          fontSize: '20px',
-          color: '#ff8844',
-          fontFamily: 'Arial',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 3,
-        })
-        .setOrigin(0.5)
-        .setDepth(281),
-    );
-
-    const btnG = this.add.graphics().setDepth(281);
-    const bx = 400,
-      by = 420,
-      bw = 200,
-      bh = 48;
-    const drawBtn = (hover: boolean) => {
-      btnG.clear();
-      btnG.fillStyle(hover ? 0x444466 : 0x333344, 1);
-      btnG.fillRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 12);
-      btnG.lineStyle(2, hover ? 0x8888aa : 0x666688, 1);
-      btnG.strokeRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 12);
-    };
-    drawBtn(false);
-    els.push(btnG);
-    els.push(
-      this.add
-        .text(bx, by, '계속하기', {
-          fontSize: '18px',
-          color: '#ffffff',
-          fontFamily: 'Arial',
-          fontStyle: 'bold',
-        })
-        .setOrigin(0.5)
-        .setDepth(282),
-    );
-    const z = this.add.zone(bx, by, bw, bh).setInteractive({ useHandCursor: true }).setDepth(283);
-    z.on('pointerover', () => drawBtn(true));
-    z.on('pointerout', () => drawBtn(false));
-    z.on('pointerdown', () => {
-      this.closeOverlay();
-      this.advanceToNextStage();
-    });
-    els.push(z);
-  }
-
-  private applyEvent(evt: EventDef) {
-    switch (evt.id) {
-      case 'spring':
-        this.playerHp = this.playerMaxHp;
-        this.playerMaxHp = Math.max(50, this.playerMaxHp - 20);
-        this.playerHp = Math.min(this.playerHp, this.playerMaxHp);
-        this.drawPlayerHpBar();
-        break;
-      case 'devil':
-        this.attackPower += 5;
-        this.gold = Math.floor(this.gold * 0.5);
-        break;
-      case 'relic_find':
-        this.awardRelicPoints(2);
-        break;
-      case 'curse':
-        this.nextCombatCursed = true;
-        break;
-      case 'bless':
-        this.tempEventAtkBuff = 10;
-        break;
-    }
-    this.updateUI();
-  }
-
-  /* ================================================================
-     MONSTER SPAWN + BOSS SYSTEM
-     ================================================================ */
-
-  private spawnMonster() {
-    const ls = this.localStage;
-    if (ls === 10 || ls === 20) {
-      this.showBossWarning(ls === 20, () => this.doSpawnMonster());
-    } else {
-      this.doSpawnMonster();
-    }
-  }
-
-  private getSubCount(): number {
-    const base = 1 + Math.floor((this.waveCurrent - 1) / 2);
-    const stageBonus = Math.floor((this.localStage - 1) / 7);
-    return Math.min(SUB_MON_POSITIONS.length, base + stageBonus);
-  }
-
-  private doSpawnMonster() {
-    const ls = this.localStage;
-    const isMiniBoss = ls === 10;
-    const isRegionBoss = ls === 20;
-    const isBoss = isMiniBoss || isRegionBoss;
-
-    this.monsters = [];
-    this.targetMonster = null;
-
-    const r = this.regionDef;
-    let baseHp = Math.floor(MON_BASE_HP * Math.pow(MON_HP_GROWTH, this.stage - 1) * r.hpMult);
-    let goldDrop = Math.floor(this.stage * 4 * this.goldDropMultiplier * r.goldMult);
-
-    if (this.isEliteStage && !isBoss) {
-      baseHp = Math.floor(baseHp * 2);
-      goldDrop = Math.floor(goldDrop * 2);
-    }
-
-    if (isBoss) {
-      this.currentBossType = isRegionBoss ? 'final' : 'mini';
-      this.showBossBackground(isRegionBoss);
-
-      const bossType = isRegionBoss ? r.bossType : r.miniBossType;
-      const bossName = isRegionBoss ? r.bossName : r.miniBossName;
-      const nameColor = isRegionBoss ? '#ffd700' : '#ff8844';
-      const hpMult = isRegionBoss ? 6 : 4;
-      const goldMult = isRegionBoss ? 10 : 5;
-      const bossSize = isRegionBoss ? 90 : 80;
-
-      const boss = new Monster(this, MAIN_MON_POS.x, MAIN_MON_POS.y, {
-        name: bossName,
-        hp: baseHp * hpMult,
-        gold: goldDrop * goldMult,
-        type: bossType,
-        size: Math.floor(bossSize * 1.5),
-        level: this.stage,
-        nameColor,
-      });
-      this.monsters.push(boss);
-
-      this.bossRageLevel = 0;
-      this.bossRageTimer = this.time.addEvent({
-        delay: isRegionBoss ? 15000 : 20000,
-        loop: true,
-        callback: () => this.advanceBossRage(isRegionBoss),
-      });
-      this.startBossPatterns();
-    } else {
-      this.currentBossType = 'none';
-      this.hideBossBackground();
-      const pool = r.monsters;
-      const data = pool[(ls - 1) % pool.length];
-
-      const specialType = this.rollSpecialType();
-      const goldMod = specialType === 'shield' ? 1.5 : specialType === 'split' ? 1.5 : 1;
-
-      const main = new Monster(this, MAIN_MON_POS.x, MAIN_MON_POS.y, {
-        name: data.name,
-        hp: baseHp,
-        gold: Math.floor(goldDrop * goldMod),
-        type: data.type,
-        size: data.size,
-        level: this.stage,
-        specialType,
-      });
-      this.monsters.push(main);
-
-      if (specialType !== 'none') {
-        this.showSpecialMonsterTooltip(specialType);
-      }
-      if (specialType === 'charge') {
-        this.startChargeTimer(main);
-      }
-
-      const subCount = this.getSubCount();
-      const subData = pool[0];
-      for (let i = 0; i < subCount; i++) {
-        const pos = SUB_MON_POSITIONS[i];
-        const sub = new Monster(this, pos.x, pos.y, {
-          name: subData.name,
-          hp: Math.floor(baseHp * 0.3),
-          gold: Math.floor(goldDrop * 0.2),
-          type: subData.type,
-          size: Math.floor(subData.size * 0.65),
-          level: this.stage,
-          isSub: true,
-        });
-        this.monsters.push(sub);
+      } else {
+        this.tweens.killTweensOf(this.emergencyDefBtn);
+        this.emergencyDefBtn.setScale(1);
       }
     }
-
-    this.setTarget(this.monsters[0]);
-    this.monsters.forEach(m => {
-      m.on('pointerdown', () => {
-        if (this.gameOver || this.cardSelecting || this.doorSelecting || m.isDead) return;
-        this.setTarget(m);
-      });
-    });
-
-    this.setupMonsterAttackTimer();
-    this.attackAccum = 0;
-    this.updateUI();
-  }
-
-  private setTarget(monster: Monster) {
-    if (this.targetMonster === monster) return;
-    if (this.targetMonster && !this.targetMonster.isDead) {
-      this.targetMonster.setTargeted(false);
-    }
-    this.targetMonster = monster;
-    this.targetMonster.setTargeted(true);
-  }
-
-  private cycleTarget() {
-    if (this.gameOver || this.cardSelecting || this.doorSelecting) return;
-    const alive = this.monsters.filter(m => !m.isDead);
-    if (alive.length <= 1) return;
-    const curIdx = alive.indexOf(this.targetMonster!);
-    const next = alive[(curIdx + 1) % alive.length];
-    this.setTarget(next);
-    DamageText.show(this, next.x, next.y - 60, '▶ TARGET', '#44ddff', '14px');
-  }
-
-  private retargetNextAlive() {
-    if (this.targetMonster) this.targetMonster.setTargeted(false);
-    const alive = this.monsters.filter(m => !m.isDead);
-    if (alive.length > 0) {
-      const mainAlive = alive.find(m => !m.isSub);
-      this.targetMonster = mainAlive ?? alive[0];
-      this.targetMonster.setTargeted(true);
-    } else {
-      this.targetMonster = null;
+    if (on && this.parryHintText) {
+      this.parryHintText.setColor('#ffdd44');
+    } else if (this.parryHintText) {
+      this.parryHintText.setColor('#887744');
     }
   }
 
-  private setupMonsterAttackTimer() {
-    this.monsterAttackTimer?.remove();
-    const aliveCount = this.monsters.filter(m => !m.isDead).length;
-    if (aliveCount === 0) return;
-    let interval: number;
-    if (this.currentBossType !== 'none') {
-      interval = this.currentBossType === 'final' ? MON_ATK_INTERVAL_FINAL : MON_ATK_INTERVAL_MINI;
-    } else {
-      interval = Math.max(1500, MON_ATK_INTERVAL_NORMAL - (aliveCount - 1) * 350);
-    }
-    this.monsterAttackTimer = this.time.addEvent({
-      delay: interval,
-      loop: true,
-      callback: () => this.battleSystem.startMonsterAttackSequence(),
+  public highlightDefenseSkills(on: boolean) {
+    this.skillButtons.forEach(btn => {
+      if (!btn) return;
+      const def = ALL_SKILL_DEFS[btn.skillId];
+      if (
+        def &&
+        (def.effectType === 'buff_self' ||
+          def.effectType === 'stealth' ||
+          def.id === 'w_shield_up' ||
+          def.id === 'r_stealth' ||
+          def.id === 'r_smoke')
+      ) {
+        btn.setHighlight(on);
+      }
     });
   }
 
-  /* ---- special monster types ---- */
-
-  private rollSpecialType(): SpecialType {
-    const ls = this.localStage;
-    const bonus = ls >= 11 ? 0.1 : 0;
-    const pool: { type: SpecialType; chance: number }[] = [];
-    if (ls >= 5) pool.push({ type: 'shield', chance: 0.3 + bonus });
-    if (ls >= 6) pool.push({ type: 'charge', chance: 0.25 + bonus });
-    if (ls >= 8) pool.push({ type: 'split', chance: 0.2 + bonus });
-    if (pool.length === 0) return 'none';
-    for (const entry of pool) {
-      if (Math.random() < entry.chance) return entry.type;
-    }
-    return 'none';
-  }
-
-  private showSpecialMonsterTooltip(type: SpecialType) {
+  public showSpecialMonsterTooltip(type: SpecialType) {
     const labels: Record<SpecialType, string> = {
       none: '',
       shield: '🛡️ 실드 몬스터 - 실드 파괴 후 본체 공격!',
@@ -4813,7 +4041,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     });
   }
 
-  private startChargeTimer(monster: Monster) {
+  public startChargeTimer(monster: Monster) {
     const timer = this.time.addEvent({
       delay: 3000,
       loop: true,
@@ -4848,7 +4076,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.chargeTimers.push(timer);
   }
 
-  private handleSplitMonster(original: Monster) {
+  public handleSplitMonster(original: Monster) {
     if (!original.canSplit) return;
     DamageText.show(this, original.x, original.y - 50, '💥 분열!', '#ffaa44', '24px');
     this.emitParticles(original.x, original.y, [0xffaa00, 0xff6600, 0xffffff], 8);
@@ -4879,467 +4107,20 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
       this.monsters.push(baby);
       baby.on('pointerdown', () => {
         if (this.gameOver || this.cardSelecting || this.doorSelecting || baby.isDead) return;
-        this.setTarget(baby);
+        this.stageManager.setTarget(baby);
       });
     }
-    this.setupMonsterAttackTimer();
+    this.stageManager.setupMonsterAttackTimer();
     if (!this.targetMonster || this.targetMonster.isDead) {
-      this.retargetNextAlive();
+      this.stageManager.retargetNextAlive();
     }
   }
 
-  private showBossWarning(isFinal: boolean, onComplete: () => void) {
-    SoundManager.sfxBossWarning();
-    SoundManager.playBossBgm();
-    const r = this.regionDef;
-
-    const blackout = this.add.graphics().setDepth(200).setAlpha(0);
-    blackout.fillStyle(0x000000, 1);
-    blackout.fillRect(0, 0, 800, 600);
-    this.tweens.add({ targets: blackout, alpha: 1, duration: 200 });
-
-    this.time.delayedCall(500, () => {
-      const warningBg = this.add.graphics().setDepth(200);
-      warningBg.fillStyle(isFinal ? 0x220000 : 0x221100, 0.85);
-      warningBg.fillRect(0, 0, 800, 600);
-      blackout.destroy();
-
-      const warnText = this.add
-        .text(400, 240, '⚠ WARNING ⚠', {
-          fontSize: '56px',
-          color: '#ff3333',
-          fontFamily: 'Arial, sans-serif',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 8,
-        })
-        .setOrigin(0.5)
-        .setDepth(201)
-        .setAlpha(0)
-        .setScale(1.5);
-      this.tweens.add({
-        targets: warnText,
-        alpha: 1,
-        scale: 1,
-        duration: 250,
-        ease: 'Back.easeOut',
-      });
-      this.tweens.add({
-        targets: warnText,
-        alpha: 0.2,
-        duration: 200,
-        yoyo: true,
-        repeat: 4,
-        delay: 300,
-      });
-
-      const bossLabel = isFinal ? `${r.bossName} 등장!` : `${r.miniBossName} 등장!`;
-      const nameText = this.add
-        .text(400, 320, bossLabel, {
-          fontSize: '36px',
-          color: isFinal ? '#ffd700' : '#ff8844',
-          fontFamily: 'Arial, sans-serif',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 6,
-        })
-        .setOrigin(0.5)
-        .setDepth(201)
-        .setAlpha(0)
-        .setScale(0.5);
-      this.tweens.add({
-        targets: nameText,
-        alpha: 1,
-        scale: 1,
-        duration: 400,
-        delay: 400,
-        ease: 'Back.easeOut',
-      });
-
-      this.cameras.main.shake(1000, 0.015);
-
-      const edgeFlash = this.add.graphics().setDepth(199);
-      const ec = isFinal ? 0xff0000 : 0xff8800;
-      edgeFlash.lineStyle(8, ec, 0.8);
-      edgeFlash.strokeRect(0, 0, 800, 600);
-      edgeFlash.lineStyle(3, ec, 0.4);
-      edgeFlash.strokeRect(6, 6, 788, 588);
-      this.tweens.add({ targets: edgeFlash, alpha: 0, duration: 250, yoyo: true, repeat: 4 });
-
-      this.time.delayedCall(2000, () => {
-        this.tweens.add({
-          targets: [warningBg, warnText, nameText, edgeFlash],
-          alpha: 0,
-          duration: 300,
-          onComplete: () => {
-            warningBg.destroy();
-            warnText.destroy();
-            nameText.destroy();
-            edgeFlash.destroy();
-            const region = this.currentRegion;
-            const narr = isFinal
-              ? NARRATION.finalBossEnter[region]
-              : NARRATION.miniBossEnter[region];
-            if (narr) {
-              this.showNarration(narr, () => onComplete());
-            } else {
-              onComplete();
-            }
-          },
-        });
-      });
-    });
-  }
-
-  /* ================================================================
-     BOSS RAGE & SPECIAL ATTACKS
-     ================================================================ */
-
-  private advanceBossRage(isFinal: boolean) {
-    const maxRage = isFinal ? 5 : 4;
-    if (this.bossRageLevel >= maxRage) return;
-    this.bossRageLevel++;
-    const rageColors = ['#ffaa00', '#ff8800', '#ff5500', '#ff2200', '#ff0000'];
-    DamageText.show(
-      this,
-      400,
-      160,
-      `분노 ${this.bossRageLevel}단계!`,
-      rageColors[this.bossRageLevel - 1],
-      '28px',
-    );
-    this.cameras.main.shake(200, 0.01 * this.bossRageLevel);
-  }
-
-  private get bossRageMult(): number {
-    return 1 + this.bossRageLevel * 0.15;
-  }
-
-  private startBossPatterns() {
-    this.bossPatternTimer?.remove();
-    this.bossPatternTimer = undefined;
-    const isFinal = this.currentBossType === 'final';
-    const baseCd = isFinal ? 6000 : 8000;
-    this.scheduleBossPattern(baseCd);
-  }
-
-  private scheduleBossPattern(delay: number) {
-    this.bossPatternTimer = this.time.delayedCall(delay, () => {
-      this.executeBossPattern();
-    });
-  }
-
-  private executeBossPattern() {
-    const boss = this.monsters.find(m => !m.isDead && !m.isSub);
-    if (this.gameOver || this.cardSelecting || this.doorSelecting || !boss) {
-      this.scheduleBossPattern(3000);
-      return;
-    }
-    const isFinal = this.currentBossType === 'final';
-    const hpPct = boss.hpRatio;
-    const cdReduction = isFinal && hpPct <= 0.2 ? 0.5 : 1;
-
-    if (this.currentBossType === 'mini') {
-      if (hpPct <= 0.3) {
-        this.bossPatternFuryRush(boss);
-      } else {
-        const roll = Math.random();
-        if (roll < 0.5) this.bossPatternSmash(boss);
-        else this.bossPatternDefense(boss);
-      }
-    } else {
-      if (hpPct <= 0.2 && Math.random() < 0.3) {
-        DamageText.show(this, boss.x, boss.y - 70, '💥 분노 폭발! 패턴 가속!', '#ff0000', '20px');
-        this.cameras.main.shake(300, 0.02);
-      }
-      const roll = Math.random();
-      if (roll < 0.3) this.bossPatternAnnihilate(boss);
-      else if (roll < 0.55) this.bossPatternSummon(boss);
-      else if (roll < 0.8) this.bossPatternCurse(boss);
-      else this.bossPatternSmash(boss);
-    }
-
-    const baseCd = isFinal ? 6000 : 8000;
-    this.scheduleBossPattern(Math.floor(baseCd * cdReduction));
-  }
-
-  private showPatternWarning(
-    boss: Phaser.GameObjects.Container,
-    text: string,
-    color: string,
-    warnTime: number,
-    onExecute: () => void,
-    responseHint?: string,
-  ) {
-    this.bossPatternWarning?.destroy();
-    const hint = responseHint ?? '방어 가능!';
-    const warnText = `${text}\n${hint}`;
-    const warn = this.add
-      .text(boss.x, boss.y - 88, warnText, {
-        fontSize: '18px',
-        color,
-        fontFamily: 'Arial',
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 4,
-        align: 'center',
-      })
-      .setOrigin(0.5)
-      .setDepth(200);
-    this.bossPatternWarning = warn;
-    this.tweens.add({
-      targets: warn,
-      alpha: 0.3,
-      duration: 300,
-      yoyo: true,
-      repeat: Math.floor(warnTime / 600),
-    });
-    this.highlightDefenseSkills(true);
-    this.battleSystem.bossAttackIncoming = true;
-    this.highlightResponseBtns(true);
-    this.time.delayedCall(warnTime, () => {
-      warn.destroy();
-      this.bossPatternWarning = undefined;
-      this.highlightDefenseSkills(false);
-      this.battleSystem.bossAttackIncoming = false;
-      this.highlightResponseBtns(false);
-      onExecute();
-    });
-  }
-
-  private highlightResponseBtns(on: boolean) {
-    if (this.emergencyDefBtn) {
-      if (on && this.emergencyDefCd <= 0) {
-        this.tweens.add({
-          targets: this.emergencyDefBtn,
-          scaleX: 1.15,
-          scaleY: 1.15,
-          duration: 250,
-          yoyo: true,
-          repeat: -1,
-          key: 'edef_pulse',
-        });
-      } else {
-        this.tweens.killTweensOf(this.emergencyDefBtn);
-        this.emergencyDefBtn.setScale(1);
-      }
-    }
-    if (on && this.parryHintText) {
-      this.parryHintText.setColor('#ffdd44');
-    } else if (this.parryHintText) {
-      this.parryHintText.setColor('#887744');
-    }
-  }
-
-  private highlightDefenseSkills(on: boolean) {
-    this.skillButtons.forEach(btn => {
-      if (!btn) return;
-      const def = ALL_SKILL_DEFS[btn.skillId];
-      if (
-        def &&
-        (def.effectType === 'buff_self' ||
-          def.effectType === 'stealth' ||
-          def.id === 'w_shield_up' ||
-          def.id === 'r_stealth' ||
-          def.id === 'r_smoke')
-      ) {
-        btn.setHighlight(on);
-      }
-    });
-  }
-
-  private bossPatternSmash(boss: Phaser.GameObjects.Container) {
-    this.showPatternWarning(
-      boss,
-      '⚔ 강타 준비!',
-      '#ffaa00',
-      2000,
-      () => {
-        if (this.gameOver) return;
-        (boss as Monster).playAttackAnimation();
-        const rawDmg = Math.max(
-          1,
-          Math.floor(this.monsterAttackPower * 3 * this.bossRageMult * (1 - this.defenseRate)),
-        );
-        if (this.tryParryBossPattern(rawDmg)) return;
-        if (this.invincible || this.stealthActive) {
-          if (this.stealthActive) this.battleSystem.tryRogueDodge();
-          DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
-          return;
-        }
-        const barrier = this.tryMageBarrier(rawDmg);
-        if (barrier.absorbed) return;
-        this.playerHp = Math.max(0, this.playerHp - rawDmg);
-        this.bossHitThisRun = true;
-        this.tryWarriorBlock(rawDmg);
-        this.drawPlayerHpBar();
-        this.playBossStrongHitEffect(rawDmg);
-        if (this.playerHp <= 0) this.showGameOver();
-      },
-      '⚔ 방어/패링 가능!',
-    );
-  }
-
-  private bossPatternDefense(boss: Phaser.GameObjects.Container) {
-    this.showPatternWarning(boss, '🛡 방어 태세!', '#4488ff', 1500, () => {
-      if (this.gameOver) return;
-      this.bossDefenseReduction = -0.8;
-      DamageText.show(this, boss.x, boss.y - 50, '방어! 데미지 -80%', '#4488ff', '18px');
-      this.bossDefenseTimer?.remove();
-      this.bossDefenseTimer = this.time.delayedCall(3000, () => {
-        this.bossDefenseReduction = 0;
-        this.bossDefenseTimer = undefined;
-      });
-    });
-  }
-
-  private bossPatternFuryRush(boss: Phaser.GameObjects.Container) {
-    DamageText.show(this, boss.x, boss.y - 80, '💢 분노 돌진!', '#ff2200', '22px');
-    this.battleSystem.bossAttackIncoming = true;
-    this.highlightResponseBtns(true);
-    this.cameras.main.shake(200, 0.015);
-    let hits = 0;
-    const hitTimer = this.time.addEvent({
-      delay: 500,
-      repeat: 2,
-      callback: () => {
-        if (this.gameOver) {
-          hitTimer.remove();
-          return;
-        }
-        const dmg = Math.max(
-          1,
-          Math.floor(this.monsterAttackPower * 1.5 * this.bossRageMult * (1 - this.defenseRate)),
-        );
-        if (this.tryParryBossPattern(dmg)) {
-          hitTimer.remove();
-          return;
-        }
-        if (this.invincible || this.stealthActive) {
-          DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '20px');
-          return;
-        }
-        const barrier = this.tryMageBarrier(dmg);
-        if (barrier.absorbed) return;
-        this.playerHp = Math.max(0, this.playerHp - dmg);
-        this.bossHitThisRun = true;
-        this.drawPlayerHpBar();
-        DamageText.show(
-          this,
-          400 + Phaser.Math.Between(-30, 30),
-          180,
-          `-${dmg}`,
-          '#ff4400',
-          '24px',
-        );
-        this.cameras.main.shake(150, 0.01);
-        this.flashScreenEdges();
-        SoundManager.sfxBossHit();
-        hits++;
-        if (this.playerHp <= 0) {
-          hitTimer.remove();
-          this.showGameOver();
-        }
-      },
-    });
-    this.time.delayedCall(2000, () => {
-      this.battleSystem.bossAttackIncoming = false;
-      this.highlightResponseBtns(false);
-    });
-  }
-
-  private bossPatternAnnihilate(boss: Phaser.GameObjects.Container) {
-    this.showPatternWarning(
-      boss,
-      '💀 절멸...',
-      '#ff0000',
-      3000,
-      () => {
-        if (this.gameOver) return;
-        const dmg = Math.max(1, Math.floor(this.playerMaxHp * 0.6));
-        if (this.tryParryBossPattern(dmg)) return;
-        if (this.invincible || this.stealthActive) {
-          if (this.stealthActive) this.battleSystem.tryRogueDodge();
-          DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
-          return;
-        }
-        const barrier = this.tryMageBarrier(dmg);
-        if (barrier.absorbed) return;
-        this.playerHp = Math.max(0, this.playerHp - dmg);
-        this.bossHitThisRun = true;
-        this.drawPlayerHpBar();
-        this.playBossStrongHitEffect(dmg);
-        this.emitParticles(400, 280, [0xff0000, 0xff4400], 14);
-        if (this.playerHp <= 0) this.showGameOver();
-      },
-      '⚠ 긴급방어/회피 가능!',
-    );
-  }
-
-  private bossPatternSummon(boss: Phaser.GameObjects.Container) {
-    this.showPatternWarning(boss, '👻 소환!', '#aa44ff', 2000, () => {
-      if (this.gameOver) return;
-      const r = this.regionDef;
-      const pool = r.monsters;
-      const data = pool[0];
-      const baseHp = Math.floor(
-        MON_BASE_HP * Math.pow(MON_HP_GROWTH, this.stage - 1) * r.hpMult * 0.3,
-      );
-      const goldDrop = Math.floor(this.stage * 2);
-      for (let i = 0; i < 2; i++) {
-        const pos = SUB_MON_POSITIONS[i];
-        if (!pos) continue;
-        const already = this.monsters.find(m => !m.isDead && Math.abs(m.x - pos.x) < 30);
-        if (already) continue;
-        const sub = new Monster(this, pos.x, pos.y, {
-          name: data.name,
-          hp: baseHp,
-          gold: goldDrop,
-          type: data.type,
-          size: Math.floor(data.size * 0.7),
-          level: this.stage,
-          isSub: true,
-        });
-        this.monsters.push(sub);
-        sub.setAlpha(0);
-        this.tweens.add({ targets: sub, alpha: 1, duration: 300 });
-      }
-      DamageText.show(this, boss.x, boss.y - 50, '소환 완료!', '#aa44ff', '18px');
-      this.emitParticles(boss.x, boss.y, [0xaa44ff, 0x6622cc], 8);
-    });
-  }
-
-  private bossPatternCurse(boss: Phaser.GameObjects.Container) {
-    this.showPatternWarning(
-      boss,
-      '🔮 저주!',
-      '#cc22ff',
-      2000,
-      () => {
-        if (this.gameOver) return;
-        if (this.tryParryBossPattern(0)) {
-          DamageText.show(this, 400, 200, '저주 반사!', '#ffd700', '22px');
-          return;
-        }
-        if (this.invincible || this.stealthActive) {
-          if (this.stealthActive) this.battleSystem.tryRogueDodge();
-          DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
-          return;
-        }
-        this.skillSealed = true;
-        this.skillButtons.forEach(btn => btn?.setMpDisabled(true));
-        DamageText.show(this, 400, 250, '🔮 스킬 10초 봉인!', '#cc22ff', '24px');
-        this.cameras.main.flash(200, 100, 0, 200);
-        this.skillSealTimer?.remove();
-        this.skillSealTimer = this.time.delayedCall(10000, () => {
-          this.skillSealed = false;
-          this.skillSealTimer = undefined;
-          this.refreshSkillButtonStates();
-          DamageText.show(this, 400, 250, '봉인 해제!', '#88ff88', '20px');
-        });
-      },
-      '⚔ 패링/회피 가능!',
-    );
+  public awardRelicPoints(pts: number) {
+    if (pts <= 0) return;
+    this.relicPointsVal = this.relicPoints + pts;
+    DamageText.show(this, 400, 100, `+${pts} 💎 유물 포인트`, '#cc88ff', '22px');
+    this.updateUI();
   }
 
   /* ================================================================
@@ -5463,6 +4244,10 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
      MONSTER COUNTERATTACK
      ================================================================ */
 
+  public handleMonsterKill(monster: Monster): void {
+    this.stageManager.handleMonsterKill(monster);
+  }
+
   public onMonsterAttack() {
     this.battleSystem.attackSeqActive = false;
     const alive = this.monsters.filter(m => !m.isDead);
@@ -5471,7 +4256,8 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     const attacker = Phaser.Math.RND.pick(alive);
     const atkMult = attacker.isSub ? 0.5 : 1;
     let monAtk = this.monsterAttackPower;
-    if (this.currentBossType !== 'none') monAtk = Math.floor(monAtk * this.bossRageMult);
+    if (this.currentBossType !== 'none')
+      monAtk = Math.floor(monAtk * this.stageManager.bossRageMult);
     if (this.monsterWeakened) monAtk = Math.floor(monAtk * (1 - this.monsterWeakenPct));
     const madnessExtra = this.markCount('madness') * 2;
     const rawDmg = Math.max(
@@ -5603,7 +4389,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.tweens.add({ targets: flash, alpha: 0, duration: 150, onComplete: () => flash.destroy() });
   }
 
-  private playBossStrongHitEffect(dmg: number) {
+  public playBossStrongHitEffect(dmg: number) {
     DamageText.show(this, 400, 160, `CRITICAL HIT!`, '#ff0000', '32px');
     DamageText.show(this, 400, 190, `-${dmg}`, '#ff2200', '28px');
     SoundManager.sfxBossHit();
@@ -5642,199 +4428,10 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
   }
 
   /* ================================================================
-     MONSTER DEATH + REGION TRANSITIONS
-     ================================================================ */
-
-  public handleMonsterKill(monster: Monster) {
-    this.totalKills++;
-    this.battleSystem.cancelParrySequence();
-    const reward = monster.goldReward;
-    this.gold += reward;
-    this.totalGoldEarned += reward;
-    SoundManager.sfxGold();
-
-    const isBoss = !monster.isSub && this.currentBossType !== 'none';
-    const wasRegionBoss = this.currentBossType === 'final' && !monster.isSub;
-    const wasMini = this.currentBossType === 'mini' && !monster.isSub;
-
-    if (isBoss) {
-      DamageText.show(
-        this,
-        monster.x,
-        monster.y - 50,
-        `BOSS KILL! +${reward} G`,
-        '#ffd700',
-        '28px',
-      );
-      this.cameras.main.shake(400, 0.02);
-      this.cameras.main.flash(300, 255, 200, 50);
-      this.emitParticles(monster.x, monster.y, [0xffd700, 0xffaa00, 0xffffff], 20);
-    } else {
-      const gSize = monster.isSub ? '18px' : '24px';
-      DamageText.show(this, monster.x, monster.y - 30, `+${reward} G`, '#ffd700', gSize);
-      this.cameras.main.shake(150, 0.008);
-      this.emitParticles(
-        monster.x,
-        monster.y,
-        [0xffffff, 0xffcc00, 0xff8800],
-        monster.isSub ? 3 : 6,
-      );
-    }
-
-    if (wasRegionBoss) {
-      this.regionBossesKilled++;
-      this.awardRelicPoints(5);
-    }
-    if (isBoss && !this.bossHitThisRun) this.checkBossNoHit();
-    if (this.legendaryEffects.steal) {
-      this.playerHp = Math.min(this.playerHp + 10, this.playerMaxHp);
-      this.drawPlayerHpBar();
-      DamageText.show(this, monster.x, monster.y - 60, '+10 HP', '#ff88cc', '14px');
-    }
-
-    const xpMult = wasRegionBoss ? 5 : wasMini ? 3 : monster.isSub ? 0.4 : 1;
-    this.waveXpAccum += Math.floor((5 + this.stage * 2) * xpMult);
-
-    if (monster === this.targetMonster) {
-      this.retargetNextAlive();
-    }
-
-    const shouldSplit = monster.specialType === 'split' && monster.canSplit;
-
-    monster.playDeathAnimation(() => {
-      const idx = this.monsters.indexOf(monster);
-      if (idx >= 0) this.monsters.splice(idx, 1);
-
-      if (shouldSplit) {
-        this.handleSplitMonster(monster);
-      }
-
-      this.setupMonsterAttackTimer();
-
-      if (this.waveClearing) return;
-      if (this.monsters.filter(m => !m.isDead).length > 0) return;
-      this.waveClearing = true;
-
-      this.poisonTimer?.remove();
-      this.poisonTimer = undefined;
-      this.bossSpecialTimer?.remove();
-      this.bossSpecialTimer = undefined;
-      this.bossPatternTimer?.remove();
-      this.bossPatternTimer = undefined;
-      this.bossPatternWarning?.destroy();
-      this.bossPatternWarning = undefined;
-      this.bossDefenseTimer?.remove();
-      this.bossDefenseTimer = undefined;
-      this.bossDefenseReduction = 0;
-      this.skillSealTimer?.remove();
-      this.skillSealTimer = undefined;
-      this.skillSealed = false;
-      this.bossRageTimer?.remove();
-      this.bossRageTimer = undefined;
-      this.bossRageLevel = 0;
-      this.chargeTimers.forEach(t => t.remove());
-      this.chargeTimers = [];
-      this.battleSystem.bossAttackIncoming = false;
-      this.battleSystem.cancelParrySequence();
-      this.highlightResponseBtns(false);
-
-      const wasBossForMemory = wasMini || wasRegionBoss;
-      const xpGain = this.waveXpAccum;
-      this.waveXpAccum = 0;
-
-      if (wasRegionBoss) {
-        this.highestStageCleared = Math.max(this.highestStageCleared, this.stage);
-        this.currentBossType = 'none';
-        this.hideBossBackground();
-        this.saveBestLocal();
-        this.awardMilestonePoints();
-        this.gainXp(xpGain);
-        const clearNarr = NARRATION.regionClear[this.currentRegion];
-        if (clearNarr) {
-          this.showNarration(clearNarr, () => this.showRunClear());
-        } else {
-          this.showRunClear();
-        }
-        return;
-      }
-
-      this.currentBossType = 'none';
-      this.hideBossBackground();
-      SoundManager.playBattleBgm();
-
-      const afterBossNarration = () => {
-        if (this.waveCurrent < this.waveTotal) {
-          this.time.delayedCall(500, () => {
-            this.gainXp(xpGain);
-            this.spawnNextWave();
-          });
-          return;
-        }
-        this.gainXp(xpGain);
-        if (this.pendingLevelUps > 0) {
-          this.pendingStageClear = true;
-          this.pendingStageClearBoss = wasBossForMemory;
-        } else {
-          this.onStageClear(wasBossForMemory);
-        }
-      };
-
-      if (wasMini) {
-        const miniNarr = NARRATION.miniBossClear[this.currentRegion];
-        if (miniNarr) {
-          this.showNarration(miniNarr, afterBossNarration);
-        } else {
-          afterBossNarration();
-        }
-      } else {
-        afterBossNarration();
-      }
-    });
-  }
-
-  /* ================================================================
-     RELIC POINTS
-     ================================================================ */
-
-  private awardRelicPoints(pts: number) {
-    if (pts <= 0) return;
-    this.relicPointsVal = this.relicPoints + pts;
-    DamageText.show(this, 400, 100, `+${pts} 💎 유물 포인트`, '#cc88ff', '22px');
-    this.updateUI();
-  }
-
-  private calculateMilestonePoints(): number {
-    let pts = 0;
-    if (this.highestStageCleared >= 10) pts += 1;
-    if (this.highestStageCleared >= 20) pts += 3;
-    if (this.highestStageCleared >= 40) pts += 6;
-    if (this.highestStageCleared >= 60) pts += 10;
-    return pts;
-  }
-
-  private awardMilestonePoints() {
-    const pts = this.calculateMilestonePoints();
-    if (pts > 0) this.awardRelicPoints(pts);
-  }
-
-  /* ================================================================
-     SAVE BEST RECORD
-     ================================================================ */
-
-  private saveBestLocal() {
-    const localCleared = this.highestStageCleared - (this.startRegion - 1) * 20;
-    const key = `bestLocal_${this.startRegion}`;
-    const current: number = this.registry.get(key) ?? 0;
-    if (localCleared > current) {
-      this.registry.set(key, localCleared);
-    }
-  }
-
-  /* ================================================================
      RUN CLEAR + PRESTIGE
      ================================================================ */
 
-  private showRunClear() {
+  public showRunClear() {
     this.gameOver = true;
     SoundManager.stopBgm();
     SoundManager.playClearFanfare();
@@ -5842,7 +4439,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     this.checkAchievements();
     this.deleteRunSave();
     this.syncPermanentToStorage();
-    const milestonePts = this.calculateMilestonePoints();
+    const milestonePts = this.stageManager.calculateMilestonePoints();
     const bossPts = this.regionBossesKilled * 3;
 
     this.showNarration(NARRATION.runClear);
@@ -5997,7 +4594,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
      GAME OVER
      ================================================================ */
 
-  private showGameOver() {
+  public showGameOver() {
     if (!this.hasRevived && this.relicLevels.immortal > 0) {
       this.hasRevived = true;
       const healPct = (20 + this.relicLevels.immortal * 10) / 100;
@@ -6010,28 +4607,28 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
       return;
     }
     this.gameOver = true;
-    this.bossSpecialTimer?.remove();
-    this.bossPatternTimer?.remove();
-    this.bossPatternTimer = undefined;
-    this.bossPatternWarning?.destroy();
-    this.bossPatternWarning = undefined;
-    this.bossDefenseTimer?.remove();
-    this.bossDefenseTimer = undefined;
-    this.bossDefenseReduction = 0;
+    this.stageManager.bossSpecialTimer?.remove();
+    this.stageManager.bossPatternTimer?.remove();
+    this.stageManager.bossPatternTimer = undefined;
+    this.stageManager.bossPatternWarning?.destroy();
+    this.stageManager.bossPatternWarning = undefined;
+    this.stageManager.bossDefenseTimer?.remove();
+    this.stageManager.bossDefenseTimer = undefined;
+    this.stageManager.bossDefenseReduction = 0;
     this.skillSealTimer?.remove();
     this.skillSealTimer = undefined;
     this.skillSealed = false;
-    this.bossRageTimer?.remove();
-    this.bossRageTimer = undefined;
-    this.bossRageLevel = 0;
-    this.monsterAttackTimer?.remove();
+    this.stageManager.bossRageTimer?.remove();
+    this.stageManager.bossRageTimer = undefined;
+    this.stageManager.bossRageLevel = 0;
+    this.stageManager.monsterAttackTimer?.remove();
     this.poisonTimer?.remove();
     this.battleSystem.bossAttackIncoming = false;
     this.battleSystem.cancelParrySequence();
     this.roguePostDodgeTimer?.remove();
     this.highlightResponseBtns(false);
-    this.saveBestLocal();
-    this.awardMilestonePoints();
+    this.stageManager.saveBestLocal();
+    this.stageManager.awardMilestonePoints();
     this.flushAchKills();
     this.checkAchievements();
     this.deleteRunSave();
@@ -6084,7 +4681,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
       .setScale(0);
     this.tweens.add({ targets: title, scale: 1, duration: 600, delay: 300, ease: 'Back.easeOut' });
 
-    const milestonePts = this.calculateMilestonePoints();
+    const milestonePts = this.stageManager.calculateMilestonePoints();
     const ptsStr = milestonePts > 0 ? ` · +${milestonePts}💎` : '';
     this.add
       .text(
@@ -6221,8 +4818,8 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
       this.stageText.setColor('#ffffff');
     }
     this.stageText.setText(stageStr);
-    if (this.waveTotal > 0 && this.waveCurrent > 0) {
-      this.waveText.setText(`Wave ${this.waveCurrent}/${this.waveTotal}`);
+    if (this.stageManager.waveTotal > 0 && this.stageManager.waveCurrent > 0) {
+      this.waveText.setText(`Wave ${this.stageManager.waveCurrent}/${this.stageManager.waveTotal}`);
       this.waveText.setVisible(true);
     } else {
       this.waveText.setText('');
@@ -6259,7 +4856,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     if (def) this.showAchievementPopup(def.icon, def.name);
   }
 
-  private checkAchievements() {
+  public checkAchievements() {
     const hs = this.highestStageCleared;
     if (hs >= 1) this.tryUnlock('stage_1');
     if (hs >= 10) this.tryUnlock('stage_10');
@@ -6298,7 +4895,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     if (this.achData.totalRunsCompleted >= 10) this.tryUnlock('runs_10');
   }
 
-  private checkBossNoHit() {
+  public checkBossNoHit() {
     if (!this.bossHitThisRun && this.currentBossType !== 'none') {
       this.tryUnlock('boss_no_hit');
     }
@@ -6409,7 +5006,7 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
     };
   }
 
-  private autoSave() {
+  public autoSave() {
     SaveManager.saveRun(this.buildRunData());
     this.syncPermanentToStorage();
     this.showSaveIcon();
@@ -6472,21 +5069,6 @@ export class GameScene extends Phaser.Scene implements IBattleSceneContext {
 
   private deleteRunSave() {
     SaveManager.deleteRun();
-  }
-
-  private checkSoulRecovery() {
-    if (this.soulRecovered || !this.soulData) return;
-    if (this.soulData.region === this.startRegion && this.soulData.stage <= this.stage) {
-      const recovered = this.soulData.gold;
-      this.gold += recovered;
-      SaveManager.deleteSoul();
-      this.soulRecovered = true;
-      this.soulData = null;
-      DamageText.show(this, 400, 250, `💀 소울 회수! +${recovered}G`, '#ffd700', '28px');
-      this.emitParticles(400, 300, [0xffd700, 0xffaa00, 0xffcc44], 12);
-      SoundManager.sfxGold();
-      this.updateUI();
-    }
   }
 
   /* ================================================================

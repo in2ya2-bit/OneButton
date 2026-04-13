@@ -630,14 +630,7 @@ export class BattleSystem {
       color = '#ffcc44';
     }
 
-    DamageText.show(
-      this.ctx,
-      400,
-      200,
-      label,
-      color,
-      isPerfect || isCounterFake ? '30px' : '24px',
-    );
+    DamageText.show(this.ctx, 400, 200, label, color, isPerfect || isCounterFake ? '30px' : '24px');
     this.ctx.cameras.main.flash(200, 255, 200, 50);
     this.ctx.emitParticles(400, 280, [0xffd700, 0xffaa00], isPerfect || isCounterFake ? 14 : 8);
     SoundManager.sfxCritical();
@@ -742,14 +735,7 @@ export class BattleSystem {
           const angle = gaugeFill.val * Math.PI * 2;
           this.parryGaugeGfx?.lineStyle(4, gaugeColor, 0.9);
           this.parryGaugeGfx?.beginPath();
-          this.parryGaugeGfx?.arc(
-            ax,
-            ay - 55,
-            GAUGE_R,
-            -Math.PI / 2,
-            -Math.PI / 2 + angle,
-            false,
-          );
+          this.parryGaugeGfx?.arc(ax, ay - 55, GAUGE_R, -Math.PI / 2, -Math.PI / 2 + angle, false);
           this.parryGaugeGfx?.strokePath();
         },
         onComplete: () => {
@@ -940,14 +926,7 @@ export class BattleSystem {
         const angle = gaugeFill.val * Math.PI * 2;
         this.parryGaugeGfx?.lineStyle(4, 0xff4444, 0.9);
         this.parryGaugeGfx?.beginPath();
-        this.parryGaugeGfx?.arc(
-          ax,
-          ay - 55,
-          GAUGE_R,
-          -Math.PI / 2,
-          -Math.PI / 2 + angle,
-          false,
-        );
+        this.parryGaugeGfx?.arc(ax, ay - 55, GAUGE_R, -Math.PI / 2, -Math.PI / 2 + angle, false);
         this.parryGaugeGfx?.strokePath();
       },
       onComplete: () => {
