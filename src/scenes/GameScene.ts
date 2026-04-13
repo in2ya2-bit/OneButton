@@ -70,7 +70,7 @@ import {
   SYNERGIES,
   AUTO_ATK_CARDS,
 } from '../config/cardData';
-import { BattleSystem } from '../systems/BattleSystem';
+import { BattleSystem, IBattleSceneContext } from '../systems/BattleSystem';
 import { StageManager } from '../systems/StageManager';
 import { CardSystem } from '../systems/CardSystem';
 import { UIManager } from '../ui/UIManager';
@@ -102,7 +102,7 @@ function skillCdCalc(id: string, level: number, cdReduction: number): number {
 
 /* ================================================================ */
 
-export class GameScene extends Phaser.Scene {
+export class GameScene extends Phaser.Scene implements IBattleSceneContext {
   /* ---- systems ---- */
 
   private battleSystem!: BattleSystem;
@@ -113,7 +113,7 @@ export class GameScene extends Phaser.Scene {
 
   /* ---- state ---- */
 
-  private gold = 0;
+  public gold = 0;
   private attackPower = INIT_ATK;
   private stage = 1;
   private highestStageCleared = 0;
@@ -145,33 +145,33 @@ export class GameScene extends Phaser.Scene {
   private invincibleTimer?: Phaser.Time.TimerEvent;
 
   /* skill-effect state */
-  private stealthActive = false;
-  private stealthGuaranteeCrit = false;
+  public stealthActive = false;
+  public stealthGuaranteeCrit = false;
   private reflectActive = false;
   private reflectPct = 0;
   private dodgeChance = 0;
   private warcryActive = false;
   private manaOverloadActive = false;
-  private monsterStunned = false;
+  public monsterStunned = false;
   private monsterWeakened = false;
   private monsterWeakenPct = 0;
-  private monsterFrozen = false;
+  public monsterFrozen = false;
   private shieldDmgReduce = 0;
   private shadowCloneActive = false;
   private shadowCloneMult = 0;
   private dotTimers: Phaser.Time.TimerEvent[] = [];
   private tempCritBonus = 0;
 
-  private gameOver = false;
-  private cardSelecting = false;
-  private shopOpen = false;
+  public gameOver = false;
+  public cardSelecting = false;
+  public shopOpen = false;
   private relicOpen = false;
-  private monsters: Monster[] = [];
-  private targetMonster: Monster | null = null;
+  public monsters: Monster[] = [];
+  public targetMonster: Monster | null = null;
   private waveXpAccum = 0;
   private poisonTimer?: Phaser.Time.TimerEvent;
 
-  private currentBossType: 'none' | 'mini' | 'final' = 'none';
+  public currentBossType: 'none' | 'mini' | 'final' = 'none';
   private bossSpecialTimer?: Phaser.Time.TimerEvent;
   private bossRageTimer?: Phaser.Time.TimerEvent;
   private bossRageLevel = 0;
@@ -182,7 +182,7 @@ export class GameScene extends Phaser.Scene {
   private waveTotal = 0;
   private waveCurrent = 0;
   private stageType: 'combat' | 'elite' | 'boss' | 'shop' | 'rest' | 'event' = 'combat';
-  private doorSelecting = false;
+  public doorSelecting = false;
   private isEliteStage = false;
   private nextCombatCursed = false;
   private tempEventAtkBuff = 0;
@@ -195,7 +195,7 @@ export class GameScene extends Phaser.Scene {
   private pendingStageClearBoss = false;
   private waveClearing = false;
   private waitingFirstCard = false;
-  private pauseOpen = false;
+  public pauseOpen = false;
   private cardRarityBonus: Record<string, number> = {};
   private legendaryEffects: Record<string, boolean> = {};
   private activeSynergies: string[] = [];
@@ -218,49 +218,12 @@ export class GameScene extends Phaser.Scene {
   private bossDefenseTimer?: Phaser.Time.TimerEvent;
 
   /* response system state */
-  private overdriveGauge = 0;
-  private overdriveActive = false;
-  private overdriveFever = false;
-  private overdriveTimer?: Phaser.Time.TimerEvent;
-  private overdriveEdgeGfx?: Phaser.GameObjects.Graphics;
-  private overdriveCountdown?: Phaser.GameObjects.Text;
-  private odReadyText?: Phaser.GameObjects.Text;
-  private odPulseTween?: Phaser.Tweens.Tween;
-  private odDarkOverlay?: Phaser.GameObjects.Graphics;
-  private odTimeBar?: Phaser.GameObjects.Graphics;
-  private odTimeBarBg?: Phaser.GameObjects.Graphics;
-  private odParticleTimer?: Phaser.Time.TimerEvent;
-  private odAuraGfx?: Phaser.GameObjects.Graphics;
-  private odAuraTween?: Phaser.Tweens.Tween;
-  private odSlotGlowTimer?: Phaser.Time.TimerEvent;
-  private odEffects: Phaser.GameObjects.GameObject[] = [];
-  private comboCount = 0;
-  private comboTimer?: Phaser.Time.TimerEvent;
   private emergencyDefCd = 0;
   private emergencyDefActive = false;
-  private parryReady = true;
-  private parryCd = 0;
-  private parryWindowOpen = false;
-  private parryWindowOpenTime = 0;
-  private parryAttempted = false;
-  private parryGaugeGfx?: Phaser.GameObjects.Graphics;
-  private parryWindowTimer?: Phaser.Time.TimerEvent;
-  private parryAuraGfx?: Phaser.GameObjects.Graphics;
-  private parrySeqId = 0;
-  private attackSeqActive = false;
-  private parryTutorialShown = false;
-  private firstParryDone = false;
-  private parrySuccessCount = 0;
-  private parryMasteryLevel = 0;
-  private parryIsFakePhase = false;
-  private parryFakeCompleted = false;
-  private parryMultiHitQueue: number[] = [];
-  private parryMultiHitSuccesses = 0;
-  private bossAttackIncoming = false;
   private mageBarrierActive = false;
   private mageBarrierAbsorb = 0;
-  private roguePostDodgeTimer?: Phaser.Time.TimerEvent;
-  private roguePostDodgeActive = false;
+  public roguePostDodgeTimer?: Phaser.Time.TimerEvent;
+  public roguePostDodgeActive = false;
 
   /* ---- UI refs ---- */
 
@@ -284,7 +247,7 @@ export class GameScene extends Phaser.Scene {
   private relicBtnBg!: Phaser.GameObjects.Graphics;
 
   private emptySlotGfx: Phaser.GameObjects.Graphics[] = [];
-  private skillButtons: (SkillButton | null)[] = [];
+  public skillButtons: (SkillButton | null)[] = [];
 
   private qSlotBgs: Phaser.GameObjects.Graphics[] = [];
   private qSlotIcons: Phaser.GameObjects.Text[] = [];
@@ -303,8 +266,8 @@ export class GameScene extends Phaser.Scene {
 
   /* response system UI */
   private overdriveGaugeBg?: Phaser.GameObjects.Graphics;
-  private overdriveGaugeFill?: Phaser.GameObjects.Graphics;
-  private overdriveGaugeText?: Phaser.GameObjects.Text;
+  public overdriveGaugeFill?: Phaser.GameObjects.Graphics;
+  public overdriveGaugeText?: Phaser.GameObjects.Text;
   private emergencyDefBtn?: Phaser.GameObjects.Container;
   private emergencyDefCdText?: Phaser.GameObjects.Text;
   private parryHintText?: Phaser.GameObjects.Text;
@@ -317,7 +280,7 @@ export class GameScene extends Phaser.Scene {
   private narrationTypingTimer?: Phaser.Time.TimerEvent;
 
   private startRegion = 1;
-  private selectedClass: ClassDef = CLASSES[0];
+  public selectedClass: ClassDef = CLASSES[0];
 
   constructor() {
     super({ key: 'GameScene' });
@@ -362,7 +325,7 @@ export class GameScene extends Phaser.Scene {
   private get currentRegion(): number {
     return Math.min(REGIONS.length, Math.ceil(this.stage / 20));
   }
-  private get localStage(): number {
+  public get localStage(): number {
     return ((this.stage - 1) % 20) + 1;
   }
   private get regionDef(): RegionDef {
@@ -413,7 +376,7 @@ export class GameScene extends Phaser.Scene {
     );
   }
 
-  private get effectiveAtk(): number {
+  public get effectiveAtk(): number {
     let base = this.attackPower + Math.floor(this.gcv('atk')) + this.tempEventAtkBuff;
     if (this.playerHp <= this.playerMaxHp * 0.1) {
       base = Math.floor(base * (1 + this.relicLevels.iron * 0.5));
@@ -486,7 +449,7 @@ export class GameScene extends Phaser.Scene {
     if (this.selectedClass.id === 'mage') m += 0.3;
     m += this.markCount('curse') * 0.25;
     if (this.manaOverloadActive) m *= 3;
-    if (this.overdriveActive) {
+    if (this.battleSystem.overdriveActive) {
       m *= 2;
       if (this.selectedClass?.id === 'mage') m *= 2;
     }
@@ -558,7 +521,7 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-W', () => this.onSkillActivate(1));
     this.input.keyboard?.on('keydown-E', () => this.onSkillActivate(2));
     this.input.keyboard?.on('keydown-R', () => this.onSkillActivate(3));
-    this.input.keyboard?.on('keydown-ENTER', () => this.tryActivateOverdrive());
+    this.input.keyboard?.on('keydown-ENTER', () => this.battleSystem.tryActivateOverdrive());
     this.input.keyboard?.on('keydown-TAB', (e: KeyboardEvent) => {
       e.preventDefault();
       this.cycleTarget();
@@ -595,7 +558,7 @@ export class GameScene extends Phaser.Scene {
 
       const showGuidesThenCard = () => {
         this.showBasicAtkTutorial(!this.autoAttackEnabled, () => {
-          this.parryTutorialShown = true;
+          this.battleSystem.parryTutorialShown = true;
           this.showParryTutorial();
           this.pendingLevelUps = 1;
           this.cardSelecting = true;
@@ -636,10 +599,10 @@ export class GameScene extends Phaser.Scene {
       this.emergencyDefCd = Math.max(0, this.emergencyDefCd - delta / 1000);
       this.updateEmergencyDefBtn();
     }
-    if (this.parryCd > 0) {
-      this.parryCd = Math.max(0, this.parryCd - delta / 1000);
-      if (this.parryCd <= 0) {
-        this.parryReady = true;
+    if (this.battleSystem.parryCd > 0) {
+      this.battleSystem.parryCd = Math.max(0, this.battleSystem.parryCd - delta / 1000);
+      if (this.battleSystem.parryCd <= 0) {
+        this.battleSystem.parryReady = true;
         this.updateParryCdDisplay();
       }
     }
@@ -706,7 +669,6 @@ export class GameScene extends Phaser.Scene {
     this.mpRegenAccum = 0;
     this.attackAccum = 0;
     this.autoAttackEnabled = false;
-    this.attackSeqActive = false;
     this.chargeTimers = [];
     this.atkBuffActive = false;
     this.invincible = false;
@@ -768,25 +730,9 @@ export class GameScene extends Phaser.Scene {
     this.tempCritBonus = 0;
     this.mpWarningShown = false;
     this.currentBossType = 'none';
-    this.overdriveGauge = 0;
-    this.overdriveActive = false;
-    this.overdriveFever = false;
-    this.comboCount = 0;
+    this.battleSystem.reset();
     this.emergencyDefCd = 0;
     this.emergencyDefActive = false;
-    this.parryReady = true;
-    this.parryCd = 0;
-    this.parryWindowOpen = false;
-    this.parryWindowOpenTime = 0;
-    this.parryAttempted = false;
-    this.parryEarlyFailed = false;
-    this.parrySuccessCount = 0;
-    this.parryMasteryLevel = 0;
-    this.parryIsFakePhase = false;
-    this.parryFakeCompleted = false;
-    this.parryMultiHitQueue = [];
-    this.parryMultiHitSuccesses = 0;
-    this.bossAttackIncoming = false;
     this.mageBarrierActive = false;
     this.mageBarrierAbsorb = 0;
     this.roguePostDodgeActive = false;
@@ -1124,7 +1070,7 @@ export class GameScene extends Phaser.Scene {
     this.playerMpText.setText(`${Math.ceil(this.playerMp)} / ${this.playerMaxMp}`);
   }
 
-  private refreshSkillButtonStates() {
+  public refreshSkillButtonStates() {
     for (let i = 0; i < this.equippedSkills.length; i++) {
       const sid = this.equippedSkills[i];
       const def = ALL_SKILL_DEFS[sid];
@@ -1581,7 +1527,7 @@ export class GameScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 1)
       .setDepth(50);
-    this.odReadyText = this.add
+    this.battleSystem.odReadyText = this.add
       .text(gx + gw / 2, gy + gh + 2, '', {
         fontSize: '10px',
         color: '#ffdd00',
@@ -1598,53 +1544,55 @@ export class GameScene extends Phaser.Scene {
       .zone(gx + gw / 2, gy + gh / 2, gw, gh + 12)
       .setInteractive()
       .setDepth(55);
-    odZone.on('pointerdown', () => this.tryActivateOverdrive());
+    odZone.on('pointerdown', () => this.battleSystem.tryActivateOverdrive());
 
     this.drawOverdriveGauge();
   }
 
   private getOdColor(): number {
-    if (this.overdriveGauge >= 80) return 0xffcc00;
-    if (this.overdriveGauge >= 50) return 0xaa44ff;
+    if (this.battleSystem.overdriveGauge >= 80) return 0xffcc00;
+    if (this.battleSystem.overdriveGauge >= 50) return 0xaa44ff;
     return 0x3388ff;
   }
 
-  private drawOverdriveGauge() {
+  public drawOverdriveGauge() {
     if (!this.overdriveGaugeFill || !this.overdriveGaugeText) return;
     const gx = 280,
       gy = SLOT_Y - 52,
       gw = 240,
       gh = 10;
     this.overdriveGaugeFill.clear();
-    const ratio = Phaser.Math.Clamp(this.overdriveGauge / 100, 0, 1);
+    const ratio = Phaser.Math.Clamp(this.battleSystem.overdriveGauge / 100, 0, 1);
     if (ratio > 0) {
       this.overdriveGaugeFill.fillStyle(this.getOdColor(), 0.9);
       this.overdriveGaugeFill.fillRoundedRect(gx, gy, gw * ratio, gh, 4);
     }
-    if (this.overdriveActive) {
+    if (this.battleSystem.overdriveActive) {
       this.overdriveGaugeText.setText('⚡ OVERDRIVE ⚡');
       this.overdriveGaugeText.setColor('#ffdd00');
     } else {
-      this.overdriveGaugeText.setText(`OD ${Math.floor(this.overdriveGauge)}%`);
-      this.overdriveGaugeText.setColor(this.overdriveGauge >= 80 ? '#ffdd00' : '#ffaa00');
+      this.overdriveGaugeText.setText(`OD ${Math.floor(this.battleSystem.overdriveGauge)}%`);
+      this.overdriveGaugeText.setColor(
+        this.battleSystem.overdriveGauge >= 80 ? '#ffdd00' : '#ffaa00',
+      );
     }
 
-    if (!this.overdriveActive && this.odReadyText) {
-      if (this.overdriveGauge >= 100) {
-        this.odReadyText.setText('OVERDRIVE! [Enter]').setAlpha(1);
-        if (!this.odPulseTween || !this.odPulseTween.isPlaying()) {
-          this.odPulseTween = this.tweens.add({
-            targets: [this.odReadyText, this.overdriveGaugeFill],
+    if (!this.battleSystem.overdriveActive && this.battleSystem.odReadyText) {
+      if (this.battleSystem.overdriveGauge >= 100) {
+        this.battleSystem.odReadyText.setText('OVERDRIVE! [Enter]').setAlpha(1);
+        if (!this.battleSystem.odPulseTween || !this.battleSystem.odPulseTween.isPlaying()) {
+          this.battleSystem.odPulseTween = this.tweens.add({
+            targets: [this.battleSystem.odReadyText, this.overdriveGaugeFill],
             alpha: 0.4,
             duration: 300,
             yoyo: true,
             repeat: -1,
           });
         }
-      } else if (this.overdriveGauge >= 80) {
-        this.odReadyText.setText('OVERDRIVE 준비!').setAlpha(1);
-        if (!this.odPulseTween || !this.odPulseTween.isPlaying()) {
-          this.odPulseTween = this.tweens.add({
+      } else if (this.battleSystem.overdriveGauge >= 80) {
+        this.battleSystem.odReadyText.setText('OVERDRIVE 준비!').setAlpha(1);
+        if (!this.battleSystem.odPulseTween || !this.battleSystem.odPulseTween.isPlaying()) {
+          this.battleSystem.odPulseTween = this.tweens.add({
             targets: this.overdriveGaugeFill,
             alpha: 0.5,
             duration: 500,
@@ -1652,389 +1600,18 @@ export class GameScene extends Phaser.Scene {
             repeat: -1,
           });
         }
-      } else if (this.overdriveGauge >= 50) {
-        this.odPulseTween?.stop();
-        this.odPulseTween = undefined;
+      } else if (this.battleSystem.overdriveGauge >= 50) {
+        this.battleSystem.odPulseTween?.stop();
+        this.battleSystem.odPulseTween = undefined;
         this.overdriveGaugeFill?.setAlpha(1);
-        this.odReadyText.setAlpha(0);
+        this.battleSystem.odReadyText.setAlpha(0);
       } else {
-        this.odPulseTween?.stop();
-        this.odPulseTween = undefined;
+        this.battleSystem.odPulseTween?.stop();
+        this.battleSystem.odPulseTween = undefined;
         this.overdriveGaugeFill?.setAlpha(1);
-        this.odReadyText.setAlpha(0);
+        this.battleSystem.odReadyText.setAlpha(0);
       }
     }
-  }
-
-  private addOverdrive(amount: number) {
-    if (this.overdriveActive) return;
-    this.overdriveGauge = Math.min(100, this.overdriveGauge + amount);
-    this.drawOverdriveGauge();
-  }
-
-  private tryActivateOverdrive() {
-    if (this.overdriveActive || this.overdriveGauge < 100) return;
-    this.activateOverdrive();
-  }
-
-  private activateOverdrive() {
-    this.overdriveActive = true;
-    this.overdriveFever = this.comboCount >= 30;
-    this.overdriveGauge = 100;
-    this.odPulseTween?.stop();
-    this.odPulseTween = undefined;
-    this.overdriveGaugeFill?.setAlpha(1);
-    this.odReadyText?.setAlpha(0);
-    this.drawOverdriveGauge();
-
-    /* --- 0) White flash + SFX --- */
-    this.cameras.main.flash(100, 255, 255, 255);
-    SoundManager.sfxLevelUp();
-    SoundManager.sfxCritical();
-
-    /* --- 1) Shockwave ring --- */
-    const ring = this.add.graphics().setDepth(200).setAlpha(1);
-    const ringObj = { r: 10, a: 1 };
-    this.tweens.add({
-      targets: ringObj,
-      r: 300,
-      a: 0,
-      duration: 500,
-      ease: 'Quad.easeOut',
-      onUpdate: () => {
-        ring.clear();
-        ring.lineStyle(4, this.overdriveFever ? 0xff44ff : 0xffcc00, ringObj.a);
-        ring.strokeCircle(400, 280, ringObj.r);
-        ring.lineStyle(2, 0xffffff, ringObj.a * 0.5);
-        ring.strokeCircle(400, 280, ringObj.r * 0.7);
-      },
-      onComplete: () => ring.destroy(),
-    });
-
-    /* --- 2) Title text bounce --- */
-    const titleLabel = this.overdriveFever ? '⚡ OVERDRIVE FEVER!! ⚡' : '⚡ OVERDRIVE!! ⚡';
-    const titleColor = this.overdriveFever ? '#ff44ff' : '#ffdd00';
-    const titleText = this.add
-      .text(400, 350, titleLabel, {
-        fontSize: '42px',
-        color: titleColor,
-        fontFamily: 'Arial',
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 6,
-      })
-      .setOrigin(0.5)
-      .setDepth(210)
-      .setAlpha(0);
-    this.tweens.add({
-      targets: titleText,
-      y: 230,
-      alpha: 1,
-      duration: 300,
-      ease: 'Back.easeOut',
-      onComplete: () => {
-        this.tweens.add({
-          targets: titleText,
-          alpha: 0,
-          y: 200,
-          duration: 600,
-          delay: 600,
-          onComplete: () => titleText.destroy(),
-        });
-      },
-    });
-
-    /* --- 3) Class-specific activation effect --- */
-    const cls = this.selectedClass?.id;
-    if (cls === 'warrior') {
-      if (this.targetMonster && !this.targetMonster.isDead) {
-        const t = this.targetMonster;
-        const dmg = Math.floor(this.effectiveAtk * 3);
-        t.takeDamage(dmg);
-        DamageText.show(this, t.x, t.y - 50, `⚔ ${dmg}`, '#ffaa00', '32px');
-        this.emitParticles(t.x, t.y, [0xff4422, 0xffcc00], 10);
-      }
-    } else if (cls === 'mage') {
-      const magic = this.add.graphics().setDepth(195).setAlpha(0);
-      magic.lineStyle(2, 0x4488ff, 1);
-      magic.strokeCircle(400, 300, 120);
-      magic.lineStyle(1, 0xffcc00, 0.8);
-      magic.strokeCircle(400, 300, 100);
-      magic.lineStyle(1, 0x4488ff, 0.6);
-      magic.strokeCircle(400, 300, 80);
-      this.tweens.add({
-        targets: magic,
-        alpha: 0.8,
-        duration: 200,
-        yoyo: true,
-        hold: 300,
-        onComplete: () => magic.destroy(),
-      });
-      this.emitParticles(400, 300, [0x4488ff, 0xffcc00, 0xffffff], 16);
-    } else if (cls === 'rogue') {
-      for (let i = 0; i < 3; i++) {
-        const ghost = this.add.graphics().setDepth(195).setAlpha(0.5);
-        ghost.fillStyle(0x9944cc, 0.4);
-        ghost.fillCircle(400 + (i - 1) * 50, 300, 25);
-        this.tweens.add({
-          targets: ghost,
-          alpha: 0,
-          x: (i - 1) * 30,
-          duration: 600,
-          delay: i * 100,
-          onComplete: () => ghost.destroy(),
-        });
-      }
-      this.emitParticles(400, 300, [0x9944cc, 0xffcc00], 14);
-    }
-
-    /* --- 4) Burst particles --- */
-    this.emitParticles(400, 280, [0xffdd00, 0xffaa00, 0xffffff], 24);
-
-    /* --- 5) Dark overlay + gold border --- */
-    this.odDarkOverlay = this.add.graphics().setDepth(5).setAlpha(0);
-    this.odDarkOverlay.fillStyle(0x000000, 0.25);
-    this.odDarkOverlay.fillRect(0, 0, 800, 600);
-    this.tweens.add({ targets: this.odDarkOverlay, alpha: 1, duration: 300 });
-
-    this.overdriveEdgeGfx = this.add.graphics().setDepth(155);
-    const edgeCol = this.overdriveFever ? 0xff44ff : 0xffcc00;
-    this.overdriveEdgeGfx.lineStyle(5, edgeCol, 0.9);
-    this.overdriveEdgeGfx.strokeRect(2, 2, 796, 596);
-    this.overdriveEdgeGfx.lineStyle(2, 0xffffff, 0.3);
-    this.overdriveEdgeGfx.strokeRect(6, 6, 788, 588);
-    this.tweens.add({
-      targets: this.overdriveEdgeGfx,
-      alpha: 0.4,
-      duration: 350,
-      yoyo: true,
-      repeat: -1,
-    });
-
-    /* --- 6) Time bar at top --- */
-    const tbx = 200,
-      tby = 8,
-      tbw = 400,
-      tbh = 6;
-    this.odTimeBarBg = this.add.graphics().setDepth(200);
-    this.odTimeBarBg.fillStyle(0x000000, 0.5);
-    this.odTimeBarBg.fillRoundedRect(tbx, tby, tbw, tbh, 3);
-    this.odTimeBar = this.add.graphics().setDepth(201);
-
-    /* --- 7) Floating gold particles --- */
-    this.odParticleTimer = this.time.addEvent({
-      delay: 120,
-      loop: true,
-      callback: () => {
-        if (!this.overdriveActive) return;
-        const px = Phaser.Math.Between(20, 780),
-          py = Phaser.Math.Between(20, 580);
-        const col = this.overdriveFever
-          ? Phaser.Math.RND.pick([0xff44ff, 0xffcc00, 0xffffff])
-          : Phaser.Math.RND.pick([0xffdd00, 0xffaa00, 0xffffff]);
-        const p = this.add.graphics().setDepth(6).setAlpha(0.7);
-        const sz = Phaser.Math.FloatBetween(1.5, 3.5);
-        p.fillStyle(col, 1);
-        p.fillCircle(0, 0, sz);
-        p.setPosition(px, py);
-        this.tweens.add({
-          targets: p,
-          y: py - 40,
-          alpha: 0,
-          duration: Phaser.Math.Between(600, 1200),
-          onComplete: () => p.destroy(),
-        });
-      },
-    });
-
-    /* --- 8) Character gold aura --- */
-    this.odAuraGfx = this.add.graphics().setDepth(90);
-    const auraObj = { angle: 0 };
-    this.odAuraTween = this.tweens.add({
-      targets: auraObj,
-      angle: 360,
-      duration: 2000,
-      repeat: -1,
-      onUpdate: () => {
-        if (!this.odAuraGfx || !this.targetMonster) return;
-        this.odAuraGfx.clear();
-        const cx = 400,
-          cy = 460;
-        for (let i = 0; i < 6; i++) {
-          const a = ((auraObj.angle + i * 60) * Math.PI) / 180;
-          const rx = cx + Math.cos(a) * 22,
-            ry = cy + Math.sin(a) * 12;
-          this.odAuraGfx.fillStyle(this.overdriveFever ? 0xff44ff : 0xffcc00, 0.5);
-          this.odAuraGfx.fillCircle(rx, ry, 3);
-        }
-      },
-    });
-
-    /* --- 9) Skill slot glow cycle --- */
-    let glowIdx = 0;
-    this.odSlotGlowTimer = this.time.addEvent({
-      delay: 200,
-      loop: true,
-      callback: () => {
-        if (!this.overdriveActive) return;
-        for (let i = 0; i < this.skillButtons.length; i++) {
-          const btn = this.skillButtons[i];
-          if (!btn) continue;
-          if (i === glowIdx % this.skillButtons.length) {
-            btn.setOverdriveGlow(true);
-          } else {
-            btn.setOverdriveGlow(false);
-          }
-        }
-        glowIdx++;
-      },
-    });
-
-    /* --- 10) Reset all skill cooldowns --- */
-    for (const btn of this.skillButtons) {
-      if (btn) btn.resetCooldown();
-    }
-
-    /* --- 11) Duration timer with countdown --- */
-    let remaining = 5;
-    this.overdriveTimer = this.time.addEvent({
-      delay: 1000,
-      repeat: 4,
-      callback: () => {
-        remaining--;
-        this.overdriveGauge = Math.max(0, (remaining / 5) * 100);
-        this.drawOverdriveGauge();
-        this.drawOdTimeBar(remaining / 5, remaining <= 2);
-        if (remaining <= 3 && remaining > 0) {
-          if (!this.overdriveCountdown) {
-            this.overdriveCountdown = this.add
-              .text(400, 160, '', {
-                fontSize: '36px',
-                color: '#ffdd00',
-                fontFamily: 'Arial',
-                fontStyle: 'bold',
-                stroke: '#000000',
-                strokeThickness: 6,
-              })
-              .setOrigin(0.5)
-              .setDepth(210);
-          }
-          this.overdriveCountdown.setText(`${remaining}`).setAlpha(1).setScale(1);
-          this.tweens.add({
-            targets: this.overdriveCountdown,
-            alpha: 0,
-            scaleX: 2.5,
-            scaleY: 2.5,
-            duration: 800,
-            onComplete: () => this.overdriveCountdown?.setScale(1),
-          });
-        }
-        if (remaining <= 0) {
-          this.endOverdrive();
-        }
-      },
-    });
-    this.drawOdTimeBar(1, false);
-
-    /* --- Hitstop (must be last so all setup completes first) --- */
-    this.time.paused = true;
-    setTimeout(() => {
-      if (!this.pauseOpen) this.time.paused = false;
-    }, 150);
-  }
-
-  private drawOdTimeBar(ratio: number, urgent: boolean) {
-    if (!this.odTimeBar) return;
-    const tbx = 200,
-      tby = 8,
-      tbw = 400,
-      tbh = 6;
-    this.odTimeBar.clear();
-    const col = urgent ? 0xff4444 : this.overdriveFever ? 0xff44ff : 0xffcc00;
-    this.odTimeBar.fillStyle(col, 0.9);
-    this.odTimeBar.fillRoundedRect(tbx, tby, tbw * ratio, tbh, 3);
-  }
-
-  private endOverdrive() {
-    this.overdriveActive = false;
-    this.overdriveFever = false;
-    this.overdriveGauge = 0;
-    this.overdriveTimer?.remove();
-    this.overdriveTimer = undefined;
-    this.odParticleTimer?.remove();
-    this.odParticleTimer = undefined;
-    this.odSlotGlowTimer?.remove();
-    this.odSlotGlowTimer = undefined;
-    this.odAuraTween?.stop();
-    this.odAuraTween = undefined;
-    this.odAuraGfx?.destroy();
-    this.odAuraGfx = undefined;
-    this.overdriveCountdown?.destroy();
-    this.overdriveCountdown = undefined;
-    this.odTimeBar?.destroy();
-    this.odTimeBar = undefined;
-    this.odTimeBarBg?.destroy();
-    this.odTimeBarBg = undefined;
-
-    for (const btn of this.skillButtons) {
-      if (btn) btn.setOverdriveGlow(false);
-    }
-
-    const endText = this.add
-      .text(400, 240, 'OVERDRIVE END', {
-        fontSize: '28px',
-        color: '#888888',
-        fontFamily: 'Arial',
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 4,
-      })
-      .setOrigin(0.5)
-      .setDepth(210)
-      .setAlpha(0.8);
-    this.tweens.add({
-      targets: endText,
-      alpha: 0,
-      y: 220,
-      duration: 1000,
-      onComplete: () => endText.destroy(),
-    });
-
-    if (this.overdriveEdgeGfx) {
-      this.tweens.add({
-        targets: this.overdriveEdgeGfx,
-        alpha: 0,
-        duration: 500,
-        onComplete: () => {
-          this.overdriveEdgeGfx?.destroy();
-          this.overdriveEdgeGfx = undefined;
-        },
-      });
-    }
-    if (this.odDarkOverlay) {
-      this.tweens.add({
-        targets: this.odDarkOverlay,
-        alpha: 0,
-        duration: 500,
-        onComplete: () => {
-          this.odDarkOverlay?.destroy();
-          this.odDarkOverlay = undefined;
-        },
-      });
-    }
-
-    this.drawOverdriveGauge();
-    this.refreshSkillButtonStates();
-  }
-
-  private addComboHit() {
-    this.comboCount++;
-    this.comboTimer?.remove();
-    this.comboTimer = this.time.delayedCall(3000, () => {
-      this.comboCount = 0;
-    });
-    if (this.comboCount === 10) this.addOverdrive(20);
-    else if (this.comboCount === 20) this.addOverdrive(40);
   }
 
   /* ---- Emergency Defense ---- */
@@ -2110,14 +1687,14 @@ export class GameScene extends Phaser.Scene {
       DamageText.show(this, 400, 200, '🔮 마법 배리어!', '#aa66ff', '24px');
       this.cameras.main.flash(100, 80, 50, 255);
       this.emitParticles(400, 280, [0xaa66ff, 0x6644cc], 8);
-      this.addOverdrive(this.bossAttackIncoming ? 30 : 0);
+      this.battleSystem.addOverdrive(this.battleSystem.bossAttackIncoming ? 30 : 0);
     } else {
       this.emergencyDefCd = 20;
       this.emergencyDefActive = true;
-      if (this.bossAttackIncoming) {
+      if (this.battleSystem.bossAttackIncoming) {
         DamageText.show(this, 400, 200, '✨ GUARD! 완전 무효화! ✨', '#44ffaa', '28px');
         this.invincible = true;
-        this.addOverdrive(30);
+        this.battleSystem.addOverdrive(30);
         this.cameras.main.flash(200, 50, 200, 255);
         this.emitParticles(400, 280, [0x44ffaa, 0x88ffdd], 10);
         this.time.delayedCall(2000, () => {
@@ -2164,69 +1741,24 @@ export class GameScene extends Phaser.Scene {
       .setOrigin(0.5)
       .setDepth(48);
 
-    this.parryGaugeGfx = this.add.graphics().setDepth(250);
-    this.parryAuraGfx = this.add.graphics().setDepth(99);
+    this.battleSystem.parryGaugeGfx = this.add.graphics().setDepth(250);
+    this.battleSystem.parryAuraGfx = this.add.graphics().setDepth(99);
 
-    this.input.keyboard?.on('keydown-SPACE', () => this.attemptParry());
+    this.input.keyboard?.on('keydown-SPACE', () => this.battleSystem.attemptParry());
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      if (pointer.rightButtonDown()) this.attemptParry();
+      if (pointer.rightButtonDown()) this.battleSystem.attemptParry();
     });
     this.game.canvas.addEventListener('contextmenu', e => e.preventDefault());
   }
 
-  private updateParryCdDisplay() {
+  public updateParryCdDisplay() {
     if (!this.parryCdOverlay) return;
-    if (this.parryCd > 0) {
-      this.parryCdOverlay.setText(`패링 쿨타임 ${Math.ceil(this.parryCd)}s`).setColor('#886644');
+    if (this.battleSystem.parryCd > 0) {
+      this.parryCdOverlay.setText(`패링 쿨타임 ${Math.ceil(this.battleSystem.parryCd)}s`).setColor(
+        '#886644',
+      );
     } else {
       this.parryCdOverlay.setText('').setColor('#aa8844');
-    }
-  }
-
-  private getParryWindow(): number {
-    const mastery = this.parryMasteryLevel >= 1 ? 20 : 0;
-    if (this.currentBossType === 'final') return 100 + mastery;
-    if (this.currentBossType === 'mini') return 150 + mastery;
-    const hasSpecial = this.monsters.some(
-      m => !m.isDead && m.specialType && m.specialType !== 'none',
-    );
-    if (hasSpecial) return 150 + mastery;
-    return 200 + mastery;
-  }
-
-  private getPerfectWindow(): number {
-    return 80 + (this.parryMasteryLevel >= 2 ? 20 : 0);
-  }
-
-  private shouldFakeAttack(): boolean {
-    const ls = this.localStage;
-    if (this.currentBossType !== 'none') return Math.random() < 0.4;
-    if (ls < 7) return false;
-    return Math.random() < Math.min(0.3, (ls - 6) * 0.04);
-  }
-
-  private getGaugeColor(): number {
-    if (this.currentBossType !== 'none') return 0xff4444;
-    if (this.parryIsFakePhase) return 0xff8800;
-    return 0xffcc00;
-  }
-
-  private getBossMultiHitCount(): number {
-    if (this.currentBossType === 'final') return Phaser.Math.Between(2, 3);
-    if (this.currentBossType === 'mini') return Phaser.Math.Between(1, 2);
-    return 1;
-  }
-
-  private checkParryMastery() {
-    if (this.parrySuccessCount >= 30 && this.parryMasteryLevel < 3) {
-      this.parryMasteryLevel = 3;
-      DamageText.show(this, 400, 260, '⚔ 패링 달인! 페이크 힌트 활성', '#ffd700', '18px');
-    } else if (this.parrySuccessCount >= 15 && this.parryMasteryLevel < 2) {
-      this.parryMasteryLevel = 2;
-      DamageText.show(this, 400, 260, '⚔ 패링 숙련! 퍼펙트 창 확대', '#ffcc44', '16px');
-    } else if (this.parrySuccessCount >= 5 && this.parryMasteryLevel < 1) {
-      this.parryMasteryLevel = 1;
-      DamageText.show(this, 400, 260, '⚔ 패링 입문! 패링 창 확대', '#ddaa44', '16px');
     }
   }
 
@@ -2344,516 +1876,22 @@ export class GameScene extends Phaser.Scene {
     this.narrationSpeaker = undefined;
   }
 
-  private cancelParrySequence() {
-    this.parrySeqId++;
-    this.attackSeqActive = false;
-    this.parryWindowTimer?.remove();
-    this.parryWindowTimer = undefined;
-    this.parryGaugeGfx?.clear();
-    this.parryAuraGfx?.clear();
-    this.parryWindowOpen = false;
-    this.parryIsFakePhase = false;
-    this.parryMultiHitQueue = [];
-    this.parryMultiHitSuccesses = 0;
-  }
-
-  private parryEarlyFailed = false;
-
-  private attemptParry() {
-    if (this.gameOver || !this.parryReady || this.cardSelecting || this.doorSelecting) return;
-    this.parryAttempted = true;
-
-    if (this.parryIsFakePhase) {
-      DamageText.show(this, 400, 230, 'FAKE!', '#ff8800', '22px');
-      return;
-    }
-
-    if (this.parryWindowOpen) {
-      const elapsed = Date.now() - this.parryWindowOpenTime;
-      const isPerfect = elapsed <= this.getPerfectWindow();
-      this.resolveParryHit(isPerfect);
-    } else if (this.attackSeqActive) {
-      this.parryEarlyFailed = true;
-      DamageText.show(this, 400, 230, 'TOO EARLY!', '#ff8800', '22px');
-      this.parryReady = false;
-      this.parryCd = 8;
-      this.updateParryCdDisplay();
-    }
-  }
-
-  private resolveParryHit(isPerfect: boolean) {
-    this.parryWindowOpen = false;
-    this.parryWindowTimer?.remove();
-    this.parryWindowTimer = undefined;
-    this.parryGaugeGfx?.clear();
-
-    if (this.parryMultiHitQueue.length > 0) {
-      this.parryMultiHitSuccesses++;
-      if (isPerfect) {
-        DamageText.show(this, 400, 200, '✨ PERFECT!', '#ffd700', '26px');
-        this.emitParticles(400, 280, [0xffd700, 0xffffff], 8);
-      } else {
-        DamageText.show(this, 400, 200, 'PARRY!', '#ffcc44', '22px');
-      }
-      SoundManager.sfxCritical();
-      this.parryMultiHitQueue.shift();
-      if (this.parryMultiHitQueue.length > 0) {
-        this.time.delayedCall(400, () => this.runMultiHitGauge());
-      }
-      return;
-    }
-
-    this.executeParryReward(isPerfect, false);
-  }
-
-  private executeParryReward(isPerfect: boolean, isCounterFake: boolean) {
-    this.parrySeqId++;
-    this.attackSeqActive = false;
-    this.parryWindowOpen = false;
-    this.parryAttempted = false;
-    this.parryEarlyFailed = false;
-    this.parryReady = false;
-    this.parryCd = 8;
-    this.updateParryCdDisplay();
-    this.parryGaugeGfx?.clear();
-    this.parryAuraGfx?.clear();
-
-    this.parrySuccessCount++;
-    this.checkParryMastery();
-
-    let atkMult: number;
-    let odGain: number;
-    let label: string;
-    let color: string;
-    let dmgReduce: number;
-
-    if (isCounterFake) {
-      atkMult = 5;
-      odGain = 100;
-      dmgReduce = 1;
-      label = '⚡ COUNTER! ⚡';
-      color = '#ffd700';
-      this.overdriveGauge = 100;
-      this.drawOverdriveGauge();
-      this.activateOverdrive();
-    } else if (isPerfect) {
-      atkMult = 3;
-      odGain = 30;
-      dmgReduce = 1;
-      label = '✨ PERFECT! ✨';
-      color = '#ffd700';
-      this.scene.pause();
-      setTimeout(() => {
-        if (this.scene.isPaused() && !this.pauseOpen) this.scene.resume();
-      }, 100);
-    } else {
-      atkMult = 1.5;
-      odGain = 15;
-      dmgReduce = 0.7;
-      label = '⚔ PARRY!';
-      color = '#ffcc44';
-    }
-
-    DamageText.show(this, 400, 200, label, color, isPerfect || isCounterFake ? '30px' : '24px');
-    this.cameras.main.flash(200, 255, 200, 50);
-    this.emitParticles(400, 280, [0xffd700, 0xffaa00], isPerfect || isCounterFake ? 14 : 8);
-    SoundManager.sfxCritical();
-
-    this.monsterStunned = true;
-    this.time.delayedCall(1000, () => {
-      this.monsterStunned = false;
-    });
-
-    if (this.targetMonster && !this.targetMonster.isDead) {
-      const counterDmg = Math.floor(this.effectiveAtk * atkMult);
-      const dead = this.targetMonster.takeDamage(counterDmg);
-      DamageText.show(
-        this,
-        this.targetMonster.x,
-        this.targetMonster.y - 50,
-        `반격! ${counterDmg}`,
-        color,
-        '22px',
-      );
-      if (dead) this.handleMonsterKill(this.targetMonster);
-    }
-
-    if (!isCounterFake) this.addOverdrive(odGain);
-
-    if (!this.firstParryDone) {
-      this.firstParryDone = true;
-      this.gold += 10;
-      DamageText.show(this, 400, 240, '첫 패링! +10G', '#ffdd44', '16px');
-      this.updateUI();
-    }
-
-    return dmgReduce;
-  }
-
-  private startMonsterAttackSequence() {
-    const alive = this.monsters.filter(m => !m.isDead);
-    if (
-      this.gameOver ||
-      this.cardSelecting ||
-      this.doorSelecting ||
-      this.pauseOpen ||
-      alive.length === 0
-    )
-      return;
-    if (this.monsterStunned || this.monsterFrozen) return;
-    if (this.attackSeqActive) return;
-
-    this.attackSeqActive = true;
-    this.parrySeqId++;
-    const seqId = this.parrySeqId;
-
-    const attacker = Phaser.Math.RND.pick(alive);
-    const ax = attacker.x,
-      ay = attacker.y;
-    const isFake = this.shouldFakeAttack();
-    const isBossMulti = this.currentBossType !== 'none' && !isFake;
-    const hitCount = isBossMulti ? this.getBossMultiHitCount() : 1;
-
-    this.parryAttempted = false;
-    this.parryEarlyFailed = false;
-    this.parryWindowOpen = false;
-    this.parryIsFakePhase = false;
-    this.parryFakeCompleted = false;
-    this.parryMultiHitQueue = [];
-    this.parryMultiHitSuccesses = 0;
-
-    const GAUGE_R = 18;
-    const stale = () => seqId !== this.parrySeqId;
-    const abortCheck = () =>
-      stale() || this.gameOver || this.monsters.filter(m => !m.isDead).length === 0;
-    const cleanup = () => {
-      this.parryAuraGfx?.clear();
-      this.parryGaugeGfx?.clear();
-      this.parryWindowOpen = false;
-      this.parryIsFakePhase = false;
-    };
-
-    const runGaugeCycle = (onDone: () => void, gaugeColor: number, fake: boolean) => {
-      const pw = this.getParryWindow();
-      const GAUGE_MS = 800;
-      this.parryAttempted = false;
-      this.parryIsFakePhase = fake;
-
-      const gaugeFill = { val: 0 };
-      const gaugeTween = this.tweens.add({
-        targets: gaugeFill,
-        val: 1,
-        duration: GAUGE_MS,
-        ease: 'Linear',
-        onUpdate: () => {
-          if (abortCheck()) {
-            gaugeTween.stop();
-            cleanup();
-            return;
-          }
-          this.parryGaugeGfx?.clear();
-          this.parryGaugeGfx?.lineStyle(4, 0x333333, 0.6);
-          this.parryGaugeGfx?.strokeCircle(ax, ay - 55, GAUGE_R);
-          const angle = gaugeFill.val * Math.PI * 2;
-          this.parryGaugeGfx?.lineStyle(4, gaugeColor, 0.9);
-          this.parryGaugeGfx?.beginPath();
-          this.parryGaugeGfx?.arc(ax, ay - 55, GAUGE_R, -Math.PI / 2, -Math.PI / 2 + angle, false);
-          this.parryGaugeGfx?.strokePath();
-        },
-        onComplete: () => {
-          if (abortCheck()) {
-            cleanup();
-            return;
-          }
-
-          if (fake) {
-            this.parryGaugeGfx?.clear();
-            this.parryGaugeGfx?.lineStyle(5, 0x44ff44, 1);
-            this.parryGaugeGfx?.strokeCircle(ax, ay - 55, GAUGE_R);
-            this.parryGaugeGfx?.fillStyle(0x44ff44, 0.3);
-            this.parryGaugeGfx?.fillCircle(ax, ay - 55, GAUGE_R - 2);
-            this.time.delayedCall(120, () => {
-              if (abortCheck()) {
-                cleanup();
-                return;
-              }
-              this.parryGaugeGfx?.clear();
-              this.parryIsFakePhase = false;
-              this.parryFakeCompleted = true;
-              if (this.parryMasteryLevel >= 3) {
-                DamageText.show(this, ax, ay - 80, '👁 페이크!', '#ff8800', '14px');
-              }
-              this.time.delayedCall(500, () => {
-                if (abortCheck()) {
-                  cleanup();
-                  return;
-                }
-                onDone();
-              });
-            });
-            return;
-          }
-
-          this.parryWindowOpen = true;
-          this.parryWindowOpenTime = Date.now();
-          this.parryGaugeGfx?.clear();
-          this.parryGaugeGfx?.lineStyle(5, 0x44ff44, 1);
-          this.parryGaugeGfx?.strokeCircle(ax, ay - 55, GAUGE_R);
-          this.parryGaugeGfx?.fillStyle(0x44ff44, 0.3);
-          this.parryGaugeGfx?.fillCircle(ax, ay - 55, GAUGE_R - 2);
-
-          this.parryWindowTimer = this.time.delayedCall(pw, () => {
-            this.parryWindowTimer = undefined;
-            this.parryWindowOpen = false;
-            this.parryGaugeGfx?.clear();
-            if (abortCheck()) return;
-            this.parryGaugeGfx?.lineStyle(5, 0xff2222, 1);
-            this.parryGaugeGfx?.strokeCircle(ax, ay - 55, GAUGE_R);
-            if (this.parryAttempted && !this.parryEarlyFailed) {
-              DamageText.show(this, 400, 230, 'TOO LATE!', '#ff8800', '22px');
-            }
-            this.parryEarlyFailed = false;
-            this.time.delayedCall(50, () => {
-              this.parryGaugeGfx?.clear();
-              if (abortCheck()) return;
-              onDone();
-            });
-          });
-        },
-      });
-    };
-
-    // Phase 1: Red aura
-    const WARN_MS = 1500;
-    const GAUGE_MS = 800;
-    this.parryAuraGfx?.clear();
-    const auraPulse = { val: 0 };
-    const auraTween = this.tweens.add({
-      targets: auraPulse,
-      val: 1,
-      duration: WARN_MS,
-      onUpdate: () => {
-        if (abortCheck()) {
-          auraTween.stop();
-          cleanup();
-          return;
-        }
-        this.parryAuraGfx?.clear();
-        const alpha = 0.15 + auraPulse.val * 0.35;
-        const radius = 40 + auraPulse.val * 15;
-        this.parryAuraGfx?.fillStyle(0xff2222, alpha);
-        this.parryAuraGfx?.fillCircle(ax, ay, radius);
-      },
-    });
-
-    this.time.delayedCall(WARN_MS - GAUGE_MS, () => {
-      if (abortCheck()) {
-        auraTween.stop();
-        cleanup();
-        return;
-      }
-
-      const showParryFail = () => {
-        if (this.parryAttempted && !this.parryEarlyFailed) {
-          DamageText.show(this, 400, 230, 'MISS!', '#ff4444', '24px');
-          this.cameras.main.flash(100, 200, 0, 0);
-        }
-        this.parryEarlyFailed = false;
-      };
-
-      if (isFake) {
-        const fakeColor = 0xff8800;
-        runGaugeCycle(
-          () => {
-            if (abortCheck()) {
-              auraTween.stop();
-              cleanup();
-              return;
-            }
-            const realColor = this.getGaugeColor();
-            runGaugeCycle(
-              () => {
-                auraTween.stop();
-                this.parryAuraGfx?.clear();
-                if (abortCheck()) return;
-                showParryFail();
-                this.onMonsterAttack();
-              },
-              realColor,
-              false,
-            );
-          },
-          fakeColor,
-          true,
-        );
-      } else if (hitCount > 1) {
-        for (let i = 0; i < hitCount; i++) this.parryMultiHitQueue.push(i);
-        this.runMultiHitGauge();
-        return;
-      } else {
-        const color = this.getGaugeColor();
-        runGaugeCycle(
-          () => {
-            auraTween.stop();
-            this.parryAuraGfx?.clear();
-            if (abortCheck()) return;
-            showParryFail();
-            this.onMonsterAttack();
-          },
-          color,
-          false,
-        );
-      }
-    });
-  }
-
-  private runMultiHitGauge() {
-    const alive = this.monsters.filter(m => !m.isDead);
-    if (this.gameOver || alive.length === 0) return;
-    const seqId = this.parrySeqId;
-    const attacker = alive[0];
-    const ax = attacker.x,
-      ay = attacker.y;
-    const remaining = this.parryMultiHitQueue.length;
-    const total = remaining + this.parryMultiHitSuccesses;
-    const GAUGE_R = 18;
-
-    DamageText.show(this, ax, ay - 80, `${total - remaining + 1}/${total}`, '#ff8844', '14px');
-
-    const pw = this.getParryWindow();
-    const GAUGE_MS = 600;
-    this.parryAttempted = false;
-    this.parryEarlyFailed = false;
-    this.parryWindowOpen = false;
-    this.parryIsFakePhase = false;
-
-    const stale = () => seqId !== this.parrySeqId;
-    const abortCheck = () =>
-      stale() || this.gameOver || this.monsters.filter(m => !m.isDead).length === 0;
-
-    const gaugeFill = { val: 0 };
-    const gaugeTween = this.tweens.add({
-      targets: gaugeFill,
-      val: 1,
-      duration: GAUGE_MS,
-      ease: 'Linear',
-      onUpdate: () => {
-        if (abortCheck()) {
-          gaugeTween.stop();
-          this.parryGaugeGfx?.clear();
-          return;
-        }
-        this.parryGaugeGfx?.clear();
-        this.parryGaugeGfx?.lineStyle(4, 0x333333, 0.6);
-        this.parryGaugeGfx?.strokeCircle(ax, ay - 55, GAUGE_R);
-        const angle = gaugeFill.val * Math.PI * 2;
-        this.parryGaugeGfx?.lineStyle(4, 0xff4444, 0.9);
-        this.parryGaugeGfx?.beginPath();
-        this.parryGaugeGfx?.arc(ax, ay - 55, GAUGE_R, -Math.PI / 2, -Math.PI / 2 + angle, false);
-        this.parryGaugeGfx?.strokePath();
-      },
-      onComplete: () => {
-        if (abortCheck()) {
-          this.parryGaugeGfx?.clear();
-          return;
-        }
-        this.parryWindowOpen = true;
-        this.parryWindowOpenTime = Date.now();
-        this.parryGaugeGfx?.clear();
-        this.parryGaugeGfx?.lineStyle(5, 0x44ff44, 1);
-        this.parryGaugeGfx?.strokeCircle(ax, ay - 55, GAUGE_R);
-        this.parryGaugeGfx?.fillStyle(0x44ff44, 0.3);
-        this.parryGaugeGfx?.fillCircle(ax, ay - 55, GAUGE_R - 2);
-
-        this.parryWindowTimer = this.time.delayedCall(pw, () => {
-          this.parryWindowTimer = undefined;
-          this.parryWindowOpen = false;
-          this.parryGaugeGfx?.clear();
-          if (abortCheck()) return;
-
-          if (this.parryAttempted && !this.parryEarlyFailed) {
-            DamageText.show(this, 400, 230, 'TOO LATE!', '#ff8800', '20px');
-          }
-          this.parryEarlyFailed = false;
-
-          this.parryMultiHitQueue.shift();
-          if (this.parryMultiHitQueue.length > 0) {
-            this.time.delayedCall(300, () => this.runMultiHitGauge());
-          } else {
-            this.finishMultiHit();
-          }
-        });
-      },
-    });
-  }
-
-  private finishMultiHit() {
-    this.attackSeqActive = false;
-    const total = this.parryMultiHitSuccesses + this.parryMultiHitQueue.length;
-    const successes = this.parryMultiHitSuccesses;
-    this.parryAuraGfx?.clear();
-    this.parryGaugeGfx?.clear();
-
-    if (successes === total && total > 1) {
-      DamageText.show(this, 400, 190, '⚡ PERFECT PARRY! ⚡', '#ffd700', '28px');
-      this.emitParticles(400, 280, [0xffd700, 0xffffff], 16);
-      this.scene.pause();
-      setTimeout(() => {
-        if (this.scene.isPaused() && !this.pauseOpen) this.scene.resume();
-      }, 100);
-      if (this.targetMonster && !this.targetMonster.isDead) {
-        const dmg = Math.floor(this.effectiveAtk * 3);
-        const dead = this.targetMonster.takeDamage(dmg);
-        DamageText.show(
-          this,
-          this.targetMonster.x,
-          this.targetMonster.y - 50,
-          `반격! ${dmg}`,
-          '#ffd700',
-          '22px',
-        );
-        if (dead) this.handleMonsterKill(this.targetMonster);
-      }
-      this.addOverdrive(30);
-      this.parrySuccessCount += total;
-      this.checkParryMastery();
-      this.parryReady = false;
-      this.parryCd = 8;
-      this.updateParryCdDisplay();
-      this.monsterStunned = true;
-      this.time.delayedCall(1500, () => {
-        this.monsterStunned = false;
-      });
-    } else if (successes > 0) {
-      this.parrySuccessCount += successes;
-      this.checkParryMastery();
-      this.parryReady = false;
-      this.parryCd = 8;
-      this.updateParryCdDisplay();
-      this.onMonsterAttack();
-    } else {
-      this.onMonsterAttack();
-    }
-    this.parryMultiHitQueue = [];
-    this.parryMultiHitSuccesses = 0;
-  }
-
   private tryParryBossPattern(incomingDmg: number): boolean {
-    if (!this.parryWindowOpen || !this.parryReady) return false;
-    const elapsed = Date.now() - this.parryWindowOpenTime;
-    const isPerfect = elapsed <= this.getPerfectWindow();
-    this.parrySeqId++;
-    this.parryWindowOpen = false;
-    this.parryWindowTimer?.remove();
-    this.parryWindowTimer = undefined;
-    this.parryReady = false;
-    this.parryCd = 8;
+    if (!this.battleSystem.parryWindowOpen || !this.battleSystem.parryReady) return false;
+    const elapsed = Date.now() - this.battleSystem.parryWindowOpenTime;
+    const isPerfect = elapsed <= this.battleSystem.getPerfectWindow();
+    this.battleSystem.parrySeqId++;
+    this.battleSystem.parryWindowOpen = false;
+    this.battleSystem.parryWindowTimer?.remove();
+    this.battleSystem.parryWindowTimer = undefined;
+    this.battleSystem.parryReady = false;
+    this.battleSystem.parryCd = 8;
     this.updateParryCdDisplay();
-    this.parryGaugeGfx?.clear();
-    this.parryAuraGfx?.clear();
+    this.battleSystem.parryGaugeGfx?.clear();
+    this.battleSystem.parryAuraGfx?.clear();
 
-    this.parrySuccessCount++;
-    this.checkParryMastery();
+    this.battleSystem.parrySuccessCount++;
+    this.battleSystem.checkParryMastery();
 
     const label = isPerfect ? '✨ PERFECT PARRY! ✨' : '⚔ PARRY!';
     const atkMult = isPerfect ? 3 : 1.5;
@@ -2890,7 +1928,7 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    this.addOverdrive(isPerfect ? 30 : 15);
+    this.battleSystem.addOverdrive(isPerfect ? 30 : 15);
     return true;
   }
 
@@ -2938,19 +1976,6 @@ export class GameScene extends Phaser.Scene {
       if (dead) this.handleMonsterKill(this.targetMonster);
     }
     return { absorbed: true, dmg: 0 };
-  }
-
-  private tryRogueDodge(): boolean {
-    if (this.selectedClass.id !== 'rogue') return false;
-    if (!this.stealthActive) return false;
-    DamageText.show(this, 400, 200, '🗡 DODGE! 암살 준비!', '#cc44ff', '26px');
-    this.roguePostDodgeActive = true;
-    this.stealthGuaranteeCrit = true;
-    this.roguePostDodgeTimer?.remove();
-    this.roguePostDodgeTimer = this.time.delayedCall(3000, () => {
-      this.roguePostDodgeActive = false;
-    });
-    return true;
   }
 
   private updateBuffBar() {
@@ -3425,11 +2450,11 @@ export class GameScene extends Phaser.Scene {
 
     if (this.isBasicAttackId(id)) {
       this.onAutoAttack(false);
-      btn?.startCooldown(this.overdriveActive ? 0 : this.skillCd(id));
+      btn?.startCooldown(this.battleSystem.overdriveActive ? 0 : this.skillCd(id));
       return;
     }
 
-    const mpCost = this.overdriveActive ? 0 : def.mpCost;
+    const mpCost = this.battleSystem.overdriveActive ? 0 : def.mpCost;
     if (this.playerMp < mpCost) {
       this.showMpWarning(def.name, def.mpCost);
       return;
@@ -3437,8 +2462,10 @@ export class GameScene extends Phaser.Scene {
     this.playerMp -= mpCost;
     this.drawMpBar();
     this.refreshSkillButtonStates();
-    this.skillButtons[slotIdx]?.startCooldown(this.overdriveActive ? 0 : this.skillCd(id));
-    this.addOverdrive(15);
+    this.skillButtons[slotIdx]?.startCooldown(
+      this.battleSystem.overdriveActive ? 0 : this.skillCd(id),
+    );
+    this.battleSystem.addOverdrive(15);
     this.playSfxForType(def.sfxType);
     this.executeSkill(def);
   }
@@ -5735,7 +4762,7 @@ export class GameScene extends Phaser.Scene {
     this.monsterAttackTimer = this.time.addEvent({
       delay: interval,
       loop: true,
-      callback: () => this.startMonsterAttackSequence(),
+      callback: () => this.battleSystem.startMonsterAttackSequence(),
     });
   }
 
@@ -6068,13 +5095,13 @@ export class GameScene extends Phaser.Scene {
       repeat: Math.floor(warnTime / 600),
     });
     this.highlightDefenseSkills(true);
-    this.bossAttackIncoming = true;
+    this.battleSystem.bossAttackIncoming = true;
     this.highlightResponseBtns(true);
     this.time.delayedCall(warnTime, () => {
       warn.destroy();
       this.bossPatternWarning = undefined;
       this.highlightDefenseSkills(false);
-      this.bossAttackIncoming = false;
+      this.battleSystem.bossAttackIncoming = false;
       this.highlightResponseBtns(false);
       onExecute();
     });
@@ -6136,7 +5163,7 @@ export class GameScene extends Phaser.Scene {
         );
         if (this.tryParryBossPattern(rawDmg)) return;
         if (this.invincible || this.stealthActive) {
-          if (this.stealthActive) this.tryRogueDodge();
+          if (this.stealthActive) this.battleSystem.tryRogueDodge();
           DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
           return;
         }
@@ -6168,7 +5195,7 @@ export class GameScene extends Phaser.Scene {
 
   private bossPatternFuryRush(boss: Phaser.GameObjects.Container) {
     DamageText.show(this, boss.x, boss.y - 80, '💢 분노 돌진!', '#ff2200', '22px');
-    this.bossAttackIncoming = true;
+    this.battleSystem.bossAttackIncoming = true;
     this.highlightResponseBtns(true);
     this.cameras.main.shake(200, 0.015);
     let hits = 0;
@@ -6216,7 +5243,7 @@ export class GameScene extends Phaser.Scene {
       },
     });
     this.time.delayedCall(2000, () => {
-      this.bossAttackIncoming = false;
+      this.battleSystem.bossAttackIncoming = false;
       this.highlightResponseBtns(false);
     });
   }
@@ -6232,7 +5259,7 @@ export class GameScene extends Phaser.Scene {
         const dmg = Math.max(1, Math.floor(this.playerMaxHp * 0.6));
         if (this.tryParryBossPattern(dmg)) return;
         if (this.invincible || this.stealthActive) {
-          if (this.stealthActive) this.tryRogueDodge();
+          if (this.stealthActive) this.battleSystem.tryRogueDodge();
           DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
           return;
         }
@@ -6295,7 +5322,7 @@ export class GameScene extends Phaser.Scene {
           return;
         }
         if (this.invincible || this.stealthActive) {
-          if (this.stealthActive) this.tryRogueDodge();
+          if (this.stealthActive) this.battleSystem.tryRogueDodge();
           DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
           return;
         }
@@ -6323,12 +5350,12 @@ export class GameScene extends Phaser.Scene {
     const t = this.targetMonster;
     if (this.gameOver || !t || t.isDead) return;
     let dmg = this.effectiveAtk;
-    if (this.overdriveActive) dmg = Math.floor(dmg * 2);
+    if (this.battleSystem.overdriveActive) dmg = Math.floor(dmg * 2);
     if (this.hasSynergy('berserker')) dmg += 5;
     let color = '#ffffff',
       size = '24px';
     const forceCrit = this.roguePostDodgeActive && this.stealthGuaranteeCrit;
-    const odCrit = this.overdriveActive && this.selectedClass?.id === 'rogue';
+    const odCrit = this.battleSystem.overdriveActive && this.selectedClass?.id === 'rogue';
     const isCrit = odCrit || forceCrit || Math.random() < this.critChance;
     let critMult = this.critDamageMult;
     if (this.hasSynergy('glass_cannon')) critMult += 0.5;
@@ -6344,11 +5371,11 @@ export class GameScene extends Phaser.Scene {
       this.roguePostDodgeActive = false;
       this.stealthGuaranteeCrit = false;
     }
-    this.addOverdrive(isAuto ? 5 : 10);
-    if (isCrit) this.addOverdrive(20);
-    this.addComboHit();
+    this.battleSystem.addOverdrive(isAuto ? 5 : 10);
+    if (isCrit) this.battleSystem.addOverdrive(20);
+    this.battleSystem.addComboHit();
 
-    if (this.overdriveActive) {
+    if (this.battleSystem.overdriveActive) {
       if (isCrit) {
         color = '#ff4444';
         size = '52px';
@@ -6369,8 +5396,8 @@ export class GameScene extends Phaser.Scene {
       DamageText.show(this, t.x, t.y - 70, '+20 HP', '#ff44aa', '14px');
     }
     if (isCrit) {
-      const critLabel = this.overdriveActive ? 'CRITICAL!!' : 'CRITICAL!';
-      const critSize = this.overdriveActive ? '26px' : '18px';
+      const critLabel = this.battleSystem.overdriveActive ? 'CRITICAL!!' : 'CRITICAL!';
+      const critSize = this.battleSystem.overdriveActive ? '26px' : '18px';
       DamageText.show(
         this,
         t.x + Phaser.Math.Between(-30, 30),
@@ -6384,20 +5411,20 @@ export class GameScene extends Phaser.Scene {
         t.x,
         t.y - 20,
         [0xff2222, 0xff6600, 0xffcc00],
-        this.overdriveActive ? 12 : 8,
+        this.battleSystem.overdriveActive ? 12 : 8,
       );
       if (this.stealthGuaranteeCrit) this.stealthGuaranteeCrit = false;
     } else {
       this.emitParticles(
         t.x + ox,
         t.y + oy,
-        this.overdriveActive ? [0xffdd00, 0xffaa00] : undefined,
+        this.battleSystem.overdriveActive ? [0xffdd00, 0xffaa00] : undefined,
       );
     }
     this.applyLifesteal(dmg);
 
     if (
-      this.overdriveActive &&
+      this.battleSystem.overdriveActive &&
       this.selectedClass?.id === 'warrior' &&
       Math.random() < 0.5 &&
       !t.isDead
@@ -6436,8 +5463,8 @@ export class GameScene extends Phaser.Scene {
      MONSTER COUNTERATTACK
      ================================================================ */
 
-  private onMonsterAttack() {
-    this.attackSeqActive = false;
+  public onMonsterAttack() {
+    this.battleSystem.attackSeqActive = false;
     const alive = this.monsters.filter(m => !m.isDead);
     if (this.gameOver || this.cardSelecting || this.doorSelecting || alive.length === 0) return;
     if (this.monsterStunned || this.monsterFrozen) return;
@@ -6455,7 +5482,8 @@ export class GameScene extends Phaser.Scene {
     attacker.playAttackAnimation();
 
     if (this.invincible || this.stealthActive) {
-      if (this.stealthActive && this.selectedClass.id === 'rogue') this.tryRogueDodge();
+      if (this.stealthActive && this.selectedClass.id === 'rogue')
+        this.battleSystem.tryRogueDodge();
       DamageText.show(this, HP_BAR.x + HP_BAR.w / 2, HP_BAR.y - 5, 'IMMUNE', '#66eeff', '20px');
       return;
     }
@@ -6471,7 +5499,7 @@ export class GameScene extends Phaser.Scene {
     if (this.currentBossType !== 'none') this.bossHitThisRun = true;
     this.drawPlayerHpBar();
     this.playHitEffect(rawDmg, this.currentBossType !== 'none');
-    this.addOverdrive(5);
+    this.battleSystem.addOverdrive(5);
 
     this.tryWarriorBlock(rawDmg);
 
@@ -6617,9 +5645,9 @@ export class GameScene extends Phaser.Scene {
      MONSTER DEATH + REGION TRANSITIONS
      ================================================================ */
 
-  private handleMonsterKill(monster: Monster) {
+  public handleMonsterKill(monster: Monster) {
     this.totalKills++;
-    this.cancelParrySequence();
+    this.battleSystem.cancelParrySequence();
     const reward = monster.goldReward;
     this.gold += reward;
     this.totalGoldEarned += reward;
@@ -6706,8 +5734,8 @@ export class GameScene extends Phaser.Scene {
       this.bossRageLevel = 0;
       this.chargeTimers.forEach(t => t.remove());
       this.chargeTimers = [];
-      this.bossAttackIncoming = false;
-      this.cancelParrySequence();
+      this.battleSystem.bossAttackIncoming = false;
+      this.battleSystem.cancelParrySequence();
       this.highlightResponseBtns(false);
 
       const wasBossForMemory = wasMini || wasRegionBoss;
@@ -6998,8 +6026,8 @@ export class GameScene extends Phaser.Scene {
     this.bossRageLevel = 0;
     this.monsterAttackTimer?.remove();
     this.poisonTimer?.remove();
-    this.bossAttackIncoming = false;
-    this.cancelParrySequence();
+    this.battleSystem.bossAttackIncoming = false;
+    this.battleSystem.cancelParrySequence();
     this.roguePostDodgeTimer?.remove();
     this.highlightResponseBtns(false);
     this.saveBestLocal();
@@ -7180,7 +6208,7 @@ export class GameScene extends Phaser.Scene {
      UI UPDATE
      ================================================================ */
 
-  private updateUI() {
+  public updateUI() {
     const r = this.regionDef;
     let stageStr = `${r.icon} ${r.name} - Stage ${this.localStage}/20`;
     if (this.currentBossType === 'mini') {
@@ -7465,7 +6493,7 @@ export class GameScene extends Phaser.Scene {
      PARTICLES
      ================================================================ */
 
-  private emitParticles(x: number, y: number, colors?: number[], count?: number) {
+  public emitParticles(x: number, y: number, colors?: number[], count?: number) {
     const c = colors ?? [0xffff00, 0xff8800, 0xffffff];
     for (let i = 0; i < (count ?? 5); i++) {
       const p = this.add.image(x, y, 'particle').setDepth(90);
