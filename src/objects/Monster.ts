@@ -58,7 +58,7 @@ export class Monster extends Phaser.GameObjects.Container {
     this.monsterSize = config.size;
     this.isSub = config.isSub ?? false;
     this.specialType = config.specialType ?? 'none';
-    this.canSplit = config.canSplit ?? (this.specialType === 'split');
+    this.canSplit = config.canSplit ?? this.specialType === 'split';
     this.monsterType = config.type;
     this.monsterName = config.name;
     this.monsterLevel = config.level;
@@ -80,7 +80,10 @@ export class Monster extends Phaser.GameObjects.Container {
     this.add(this.targetRing);
 
     const shadow = scene.add.sprite(5, 10, textureKey);
-    shadow.setTint(0x000000).setAlpha(0.2).setScale(scale * 1.05);
+    shadow
+      .setTint(0x000000)
+      .setAlpha(0.2)
+      .setScale(scale * 1.05);
     this.add(shadow);
 
     this.bodySprite = scene.add.sprite(0, 0, textureKey);
@@ -99,7 +102,12 @@ export class Monster extends Phaser.GameObjects.Container {
     if (this.specialType === 'charge') {
       this.chargeGlow = scene.add.graphics();
       this.chargeGlow.lineStyle(2, 0xff2222, 0.5);
-      this.chargeGlow.strokeRect(-config.size * 0.7, -config.size * 0.7, config.size * 1.4, config.size * 1.4);
+      this.chargeGlow.strokeRect(
+        -config.size * 0.7,
+        -config.size * 0.7,
+        config.size * 1.4,
+        config.size * 1.4,
+      );
       this.add(this.chargeGlow);
     }
 
@@ -113,13 +121,15 @@ export class Monster extends Phaser.GameObjects.Container {
     this.hpBarFill = scene.add.graphics();
     this.add(this.hpBarFill);
 
-    this.hpText = scene.add.text(0, this.barY + this.barH / 2, '', {
-      fontSize: this.isSub ? '9px' : '11px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 2,
-    }).setOrigin(0.5);
+    this.hpText = scene.add
+      .text(0, this.barY + this.barH / 2, '', {
+        fontSize: this.isSub ? '9px' : '11px',
+        color: '#ffffff',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5);
     this.add(this.hpText);
 
     if (this.specialType === 'shield') {
@@ -132,26 +142,43 @@ export class Monster extends Phaser.GameObjects.Container {
       this.add(sbBg);
       this.shieldBarFill = scene.add.graphics();
       this.add(this.shieldBarFill);
-      this.shieldText = scene.add.text(0, sbY + 3, '', {
-        fontSize: '8px', color: '#aaddff', fontFamily: 'Arial',
-        stroke: '#000000', strokeThickness: 1,
-      }).setOrigin(0.5);
+      this.shieldText = scene.add
+        .text(0, sbY + 3, '', {
+          fontSize: '8px',
+          color: '#aaddff',
+          fontFamily: 'Arial',
+          stroke: '#000000',
+          strokeThickness: 1,
+        })
+        .setOrigin(0.5);
       this.add(this.shieldText);
     }
 
-    const typeIcons: Record<SpecialType, string> = { none: '', shield: '🛡️', split: '💥', charge: '⚡' };
+    const typeIcons: Record<SpecialType, string> = {
+      none: '',
+      shield: '🛡️',
+      split: '💥',
+      charge: '⚡',
+    };
     const typeIcon = typeIcons[this.specialType];
     const nameFontSize = this.isSub ? '14px' : '20px';
     const displayName = this.isSub
       ? config.name
       : `${typeIcon ? typeIcon + ' ' : ''}${config.name} Lv.${config.level}`;
-    const nameText = scene.add.text(0, this.barY - (this.isSub ? 14 : 20) - (this.specialType === 'shield' ? 10 : 0), displayName, {
-      fontSize: nameFontSize,
-      color: config.nameColor ?? (this.isSub ? '#aaaaaa' : '#ffffff'),
-      fontFamily: 'Arial, sans-serif',
-      stroke: '#000000',
-      strokeThickness: this.isSub ? 3 : 4,
-    }).setOrigin(0.5);
+    const nameText = scene.add
+      .text(
+        0,
+        this.barY - (this.isSub ? 14 : 20) - (this.specialType === 'shield' ? 10 : 0),
+        displayName,
+        {
+          fontSize: nameFontSize,
+          color: config.nameColor ?? (this.isSub ? '#aaaaaa' : '#ffffff'),
+          fontFamily: 'Arial, sans-serif',
+          stroke: '#000000',
+          strokeThickness: this.isSub ? 3 : 4,
+        },
+      )
+      .setOrigin(0.5);
     this.add(nameText);
 
     this.updateHpBar();
@@ -185,19 +212,24 @@ export class Monster extends Phaser.GameObjects.Container {
     scene.add.existing(this as unknown as Phaser.GameObjects.GameObject);
   }
 
-  get hasShield(): boolean { return this.shieldHp > 0; }
+  get hasShield(): boolean {
+    return this.shieldHp > 0;
+  }
 
   private updateShieldBar() {
     if (!this.shieldBarFill || !this.shieldText) return;
     const sbY = this.barY - this.barH - 6;
-    const ratio = this.shieldMaxHp > 0 ? Phaser.Math.Clamp(this.shieldHp / this.shieldMaxHp, 0, 1) : 0;
+    const ratio =
+      this.shieldMaxHp > 0 ? Phaser.Math.Clamp(this.shieldHp / this.shieldMaxHp, 0, 1) : 0;
     const fw = this.barW * ratio;
     this.shieldBarFill.clear();
     if (fw > 0) {
       this.shieldBarFill.fillStyle(0x4488ff, 1);
       this.shieldBarFill.fillRoundedRect(-this.barW / 2, sbY, fw, 6, Math.min(3, fw / 2));
     }
-    this.shieldText.setText(this.shieldHp > 0 ? `${Math.ceil(this.shieldHp)} / ${this.shieldMaxHp}` : '');
+    this.shieldText.setText(
+      this.shieldHp > 0 ? `${Math.ceil(this.shieldHp)} / ${this.shieldMaxHp}` : '',
+    );
     if (this.shieldGlow) this.shieldGlow.setVisible(this.shieldHp > 0);
   }
 
@@ -220,8 +252,12 @@ export class Monster extends Phaser.GameObjects.Container {
       this.targetRing.lineStyle(1, 0xffff00, 0.3);
       this.targetRing.strokeEllipse(0, ry, w + 8, h + 5);
       this.targetTween = this.scene.tweens.add({
-        targets: this.targetRing, alpha: 0.4,
-        duration: 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+        targets: this.targetRing,
+        alpha: 0.4,
+        duration: 600,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
       });
     }
   }
@@ -315,7 +351,12 @@ export class Monster extends Phaser.GameObjects.Container {
       if (this.bodySprite?.active) this.bodySprite.clearTint();
     });
     this.scene.tweens.add({
-      targets: this, scaleX: 0.88, scaleY: 0.88, duration: 80, yoyo: true, ease: 'Sine.easeOut',
+      targets: this,
+      scaleX: 0.88,
+      scaleY: 0.88,
+      duration: 80,
+      yoyo: true,
+      ease: 'Sine.easeOut',
     });
     return this.currentHp <= 0;
   }
@@ -349,7 +390,8 @@ export class Monster extends Phaser.GameObjects.Container {
         targets: circle,
         x: cx + Phaser.Math.Between(-70, 70),
         y: cy + Phaser.Math.Between(-90, -15),
-        alpha: 0, scale: 0,
+        alpha: 0,
+        scale: 0,
         duration: Phaser.Math.Between(250, 550),
         ease: 'Quad.easeOut',
         onComplete: () => circle.destroy(),
@@ -357,14 +399,25 @@ export class Monster extends Phaser.GameObjects.Container {
     }
 
     this.scene.tweens.add({
-      targets: this, scaleX: 1.3, scaleY: 1.3,
-      duration: 80, yoyo: true, ease: 'Sine.easeOut',
+      targets: this,
+      scaleX: 1.3,
+      scaleY: 1.3,
+      duration: 80,
+      yoyo: true,
+      ease: 'Sine.easeOut',
       onComplete: () => {
         this.scene.tweens.add({
           targets: this,
-          scaleX: 1.5, scaleY: 0.15, alpha: 0, y: this.baseY + 30,
-          duration: this.isSub ? 250 : 350, ease: 'Back.easeIn',
-          onComplete: () => { this.destroy(); onComplete(); },
+          scaleX: 1.5,
+          scaleY: 0.15,
+          alpha: 0,
+          y: this.baseY + 30,
+          duration: this.isSub ? 250 : 350,
+          ease: 'Back.easeIn',
+          onComplete: () => {
+            this.destroy();
+            onComplete();
+          },
         });
       },
     });

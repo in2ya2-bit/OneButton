@@ -26,8 +26,10 @@ export class SkillButton extends Phaser.GameObjects.Container {
 
   constructor(
     scene: Phaser.Scene,
-    x: number, y: number,
-    w: number, h: number,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
     config: SkillConfig,
   ) {
     super(scene, x, y);
@@ -39,40 +41,49 @@ export class SkillButton extends Phaser.GameObjects.Container {
     this.add(this.bg);
     this.drawBg(false);
 
-    this.iconText = scene.add.text(0, -8, config.icon, {
-      fontSize: '24px',
-    }).setOrigin(0.5);
+    this.iconText = scene.add
+      .text(0, -8, config.icon, {
+        fontSize: '24px',
+      })
+      .setOrigin(0.5);
     this.add(this.iconText);
 
-    const label = scene.add.text(0, h / 2 - 11, config.name, {
-      fontSize: '10px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      stroke: '#000000',
-      strokeThickness: 2,
-    }).setOrigin(0.5);
+    const label = scene.add
+      .text(0, h / 2 - 11, config.name, {
+        fontSize: '10px',
+        color: '#ffffff',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5);
     this.add(label);
 
     this.overlay = scene.add.graphics();
     this.add(this.overlay);
 
-    this.cdText = scene.add.text(0, -4, '', {
-      fontSize: '22px',
-      color: '#ffffff',
-      fontFamily: 'Arial',
-      fontStyle: 'bold',
-      stroke: '#000000',
-      strokeThickness: 3,
-    }).setOrigin(0.5).setVisible(false);
+    this.cdText = scene.add
+      .text(0, -4, '', {
+        fontSize: '22px',
+        color: '#ffffff',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setVisible(false);
     this.add(this.cdText);
 
-    const zone = scene.add.zone(0, 0, w, h)
-      .setInteractive({ useHandCursor: true });
+    const zone = scene.add.zone(0, 0, w, h).setInteractive({ useHandCursor: true });
     this.add(zone);
 
     zone.on('pointerdown', () => {
       if (!this.ready) return;
-      if (this.mpDisabled) { this.emit('activate-blocked'); return; }
+      if (this.mpDisabled) {
+        this.emit('activate-blocked');
+        return;
+      }
       this.emit('activate');
     });
     zone.on('pointerover', () => {
@@ -92,10 +103,7 @@ export class SkillButton extends Phaser.GameObjects.Container {
     const { bw: w, bh: h, conf } = this;
     this.bg.clear();
     const usable = this.ready && !this.mpDisabled;
-    this.bg.fillStyle(
-      usable ? (hover ? conf.hoverColor : conf.color) : 0x333333,
-      1,
-    );
+    this.bg.fillStyle(usable ? (hover ? conf.hoverColor : conf.color) : 0x333333, 1);
     this.bg.fillRoundedRect(-w / 2, -h / 2, w, h, 10);
     if (this.highlighted && usable) {
       this.bg.lineStyle(3, 0x00ffaa, 0.9);
@@ -109,7 +117,7 @@ export class SkillButton extends Phaser.GameObjects.Container {
     if (this.mpDisabled === disabled) return;
     this.mpDisabled = disabled;
     this.drawBg(false);
-    this.iconText.setAlpha(disabled && this.ready ? 0.4 : (this.ready ? 1 : 0.3));
+    this.iconText.setAlpha(disabled && this.ready ? 0.4 : this.ready ? 1 : 0.3);
   }
 
   setHighlight(on: boolean) {
@@ -125,10 +133,7 @@ export class SkillButton extends Phaser.GameObjects.Container {
     const inset = 3;
     const overlayH = (h - inset * 2) * ratio;
     this.overlay.fillStyle(0x000000, 0.55);
-    this.overlay.fillRect(
-      -w / 2 + inset, -h / 2 + inset,
-      w - inset * 2, overlayH,
-    );
+    this.overlay.fillRect(-w / 2 + inset, -h / 2 + inset, w - inset * 2, overlayH);
   }
 
   startCooldown(overrideCd?: number) {

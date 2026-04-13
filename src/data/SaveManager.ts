@@ -23,11 +23,35 @@ export interface MarkInfo {
 }
 
 export const MARK_DEFS: Record<MarkId, MarkInfo> = {
-  dark:    { id: 'dark',    name: '어둠의 각인',  icon: '🌑', penalty: '최대 HP -15',       bonus: 'ATK +3' },
-  curse:   { id: 'curse',   name: '저주의 각인',  icon: '💀', penalty: 'MP 회복 -20%',     bonus: '스킬 데미지 +25%' },
-  fear:    { id: 'fear',    name: '공포의 각인',  icon: '👁️', penalty: '받는 데미지 +10%',  bonus: '골드 드롭 +30%' },
-  despair: { id: 'despair', name: '절망의 각인',  icon: '💔', penalty: '포션 효과 -20%',    bonus: '크리티컬 +15%' },
-  madness: { id: 'madness', name: '광기의 각인',  icon: '🔥', penalty: '공격속도 +20%',     bonus: '피격 시 HP -2 추가' },
+  dark: { id: 'dark', name: '어둠의 각인', icon: '🌑', penalty: '최대 HP -15', bonus: 'ATK +3' },
+  curse: {
+    id: 'curse',
+    name: '저주의 각인',
+    icon: '💀',
+    penalty: 'MP 회복 -20%',
+    bonus: '스킬 데미지 +25%',
+  },
+  fear: {
+    id: 'fear',
+    name: '공포의 각인',
+    icon: '👁️',
+    penalty: '받는 데미지 +10%',
+    bonus: '골드 드롭 +30%',
+  },
+  despair: {
+    id: 'despair',
+    name: '절망의 각인',
+    icon: '💔',
+    penalty: '포션 효과 -20%',
+    bonus: '크리티컬 +15%',
+  },
+  madness: {
+    id: 'madness',
+    name: '광기의 각인',
+    icon: '🔥',
+    penalty: '공격속도 +20%',
+    bonus: '피격 시 HP -2 추가',
+  },
 };
 
 export interface PermanentData {
@@ -91,12 +115,18 @@ export interface AchievementSave {
 function load<T>(key: string): T | null {
   try {
     const raw = localStorage.getItem(key);
-    return raw ? JSON.parse(raw) as T : null;
-  } catch { return null; }
+    return raw ? (JSON.parse(raw) as T) : null;
+  } catch {
+    return null;
+  }
 }
 
 function save(key: string, data: unknown) {
-  try { localStorage.setItem(key, JSON.stringify(data)); } catch { /* quota */ }
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    /* quota */
+  }
 }
 
 export const SaveManager = {
@@ -113,14 +143,24 @@ export const SaveManager = {
     };
   },
 
-  savePermanent(data: PermanentData) { save(PERM_KEY, data); },
+  savePermanent(data: PermanentData) {
+    save(PERM_KEY, data);
+  },
 
   /* ---- run ---- */
 
-  loadRun(): RunData | null { return load<RunData>(RUN_KEY); },
-  saveRun(data: RunData) { save(RUN_KEY, data); },
-  deleteRun() { localStorage.removeItem(RUN_KEY); },
-  hasRun(): boolean { return localStorage.getItem(RUN_KEY) !== null; },
+  loadRun(): RunData | null {
+    return load<RunData>(RUN_KEY);
+  },
+  saveRun(data: RunData) {
+    save(RUN_KEY, data);
+  },
+  deleteRun() {
+    localStorage.removeItem(RUN_KEY);
+  },
+  hasRun(): boolean {
+    return localStorage.getItem(RUN_KEY) !== null;
+  },
 
   /* ---- settings ---- */
 
@@ -133,7 +173,9 @@ export const SaveManager = {
       fullscreen: d?.fullscreen ?? false,
     };
   },
-  saveSettings(data: SettingsData) { save(SETTINGS_KEY, data); },
+  saveSettings(data: SettingsData) {
+    save(SETTINGS_KEY, data);
+  },
 
   /* ---- achievements ---- */
 
@@ -148,13 +190,21 @@ export const SaveManager = {
       bossHitThisRun: d?.bossHitThisRun ?? false,
     };
   },
-  saveAchievements(data: AchievementSave) { save(ACH_KEY, data); },
+  saveAchievements(data: AchievementSave) {
+    save(ACH_KEY, data);
+  },
 
   /* ---- soul ---- */
 
-  loadSoul(): SoulData | null { return load<SoulData>(SOUL_KEY); },
-  saveSoul(data: SoulData) { save(SOUL_KEY, data); },
-  deleteSoul() { localStorage.removeItem(SOUL_KEY); },
+  loadSoul(): SoulData | null {
+    return load<SoulData>(SOUL_KEY);
+  },
+  saveSoul(data: SoulData) {
+    save(SOUL_KEY, data);
+  },
+  deleteSoul() {
+    localStorage.removeItem(SOUL_KEY);
+  },
 
   /* ---- death marks ---- */
 
@@ -162,7 +212,9 @@ export const SaveManager = {
     const d = load<MarkId[]>(MARK_KEY);
     return Array.isArray(d) ? d : [];
   },
-  saveMarks(marks: MarkId[]) { save(MARK_KEY, marks); },
+  saveMarks(marks: MarkId[]) {
+    save(MARK_KEY, marks);
+  },
 
   /* ---- reset ---- */
 

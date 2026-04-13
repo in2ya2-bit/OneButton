@@ -5,135 +5,82 @@ import { SkillButton } from '../objects/SkillButton';
 import { REGIONS, RegionDef } from '../data/regions';
 import { DEFAULT_RELIC_LEVELS } from '../data/relics';
 import { CLASSES, ClassDef } from '../data/classes';
-import { SaveManager, RunData, AchievementSave, SoulData, MarkId, ALL_MARK_IDS, MARK_DEFS } from '../data/SaveManager';
+import {
+  SaveManager,
+  RunData,
+  AchievementSave,
+  SoulData,
+  MarkId,
+  ALL_MARK_IDS,
+  MARK_DEFS,
+} from '../data/SaveManager';
 import { SoundManager } from '../data/SoundManager';
 import { ACHIEVEMENTS } from '../data/achievements';
 import { RelicPanel } from '../objects/RelicPanel';
-import { ALL_SKILL_DEFS, CLASS_SKILL_POOLS, BASIC_ATTACK_SKILLS, SkillDef, SfxType } from '../data/skillDefs';
+import {
+  ALL_SKILL_DEFS,
+  CLASS_SKILL_POOLS,
+  BASIC_ATTACK_SKILLS,
+  SkillDef,
+  SfxType,
+} from '../data/skillDefs';
 import { SpecialType } from '../objects/Monster';
 import { NARRATION, NarrationEntry } from '../data/narration';
-
-/* ---- card definitions ---- */
-
-interface CardDef {
-  id: string; name: string; icon: string; color: number;
-  baseValue: number; rareValue: number; legendValue: number;
-  descFn: (v: number) => string; isSkill?: boolean;
-}
-
-const STAT_CARDS: CardDef[] = [
-  { id: 'hp',    name: 'HP 증가',      icon: '❤️', color: 0xcc2222, baseValue: 20,   rareValue: 30,   legendValue: 50,   descFn: v => `최대 HP +${Math.floor(v)}` },
-  { id: 'atk',   name: '공격력 증가',   icon: '⚔️', color: 0xff6622, baseValue: 3,    rareValue: 5,    legendValue: 8,    descFn: v => `ATK +${Math.floor(v)}` },
-  { id: 'spd',   name: '공격속도 증가',  icon: '💨', color: 0x2288cc, baseValue: 0.08, rareValue: 0.12, legendValue: 0.2,  descFn: v => `공격 간격 -${v.toFixed(2)}s` },
-  { id: 'crit',  name: '치명타 확률',   icon: '🎯', color: 0xffaa00, baseValue: 8,    rareValue: 12,   legendValue: 20,   descFn: v => `치명타 +${Math.floor(v)}%` },
-  { id: 'def',   name: '방어력 증가',   icon: '🛡️', color: 0x4488cc, baseValue: 8,    rareValue: 12,   legendValue: 20,   descFn: v => `피해 -${Math.floor(v)}%` },
-  { id: 'steal', name: '흡혈',         icon: '🩸', color: 0x882266, baseValue: 4,    rareValue: 6,    legendValue: 10,   descFn: v => `공격 시 HP ${v.toFixed(1)}% 회복` },
-  { id: 'mp',    name: 'MP 증가',      icon: '💎', color: 0x2244cc, baseValue: 15,   rareValue: 25,   legendValue: 40,   descFn: v => `최대 MP +${Math.floor(v)}` },
-];
+import {
+  INIT_HP,
+  INIT_ATK,
+  INIT_ATK_INTERVAL_MS,
+  MIN_ATK_INTERVAL_MS,
+  INIT_MP,
+  MP_REGEN_PER_SEC,
+  MON_BASE_HP,
+  MON_HP_GROWTH,
+  MON_BASE_ATK,
+  MON_ATK_GROWTH,
+  MON_ATK_INTERVAL_NORMAL,
+  MON_ATK_INTERVAL_MINI,
+  MON_ATK_INTERVAL_FINAL,
+  SHOP_BTN,
+  RELIC_BTN,
+  HP_BAR,
+  MP_BAR,
+  XP_BAR,
+  MAIN_MON_POS,
+  SUB_MON_POSITIONS,
+  MAX_SLOTS,
+  SLOT_W,
+  SLOT_H,
+  SLOT_Y,
+  SLOT_XS,
+  QSLOT_W,
+  QSLOT_H,
+  QSLOT_Y,
+  QSLOT_XS,
+  MAX_POTION_STACK,
+} from '../config/constants';
+import type { CardDef, CardRarity, QuickSlotData } from '../types/index';
+import {
+  STAT_CARDS,
+  POTION_DATA,
+  SHOP_ITEMS,
+  DOOR_DEFS,
+  EVENTS,
+  RARITY_COLORS,
+  LEGENDARY_DESCS,
+  SYNERGIES,
+  AUTO_ATK_CARDS,
+} from '../config/cardData';
 
 function cv(base: number, level: number): number {
   return level <= 0 ? 0 : base * level;
 }
 
-/* ---- potion definitions ---- */
-
-interface PotionDef { healAmount: number; bgColor: number; borderColor: number; label: string }
-
-const POTION_DATA: Record<number, PotionDef> = {
-  1: { healAmount: 35,  bgColor: 0x1a2e1a, borderColor: 0x44aa44, label: 'Lv.1' },
-  2: { healAmount: 80,  bgColor: 0x1a1a2e, borderColor: 0x4488cc, label: 'Lv.2' },
-  3: { healAmount: -1,  bgColor: 0x2a1a2e, borderColor: 0x9944cc, label: 'Lv.3' },
-};
-const MAX_POTION_STACK = 9;
-
-interface ShopItemDef {
-  name: string; desc: string; cost: number; icon: string;
-  kind: 'potion' | 'buff'; potionLv?: number; buffType?: string;
-}
-const SHOP_ITEMS: ShopItemDef[] = [
-  { name: 'Lv.1 포션', desc: 'HP +35',            cost: 30,  icon: '🧪', kind: 'potion', potionLv: 1 },
-  { name: 'Lv.2 포션', desc: 'HP +80',            cost: 65,  icon: '🧪', kind: 'potion', potionLv: 2 },
-  { name: 'Lv.3 포션', desc: 'HP 완전 회복',       cost: 130, icon: '🧪', kind: 'potion', potionLv: 3 },
-  { name: '공격력 버프', desc: 'ATK 50%↑ (30초)',   cost: 50,  icon: '🗡️', kind: 'buff', buffType: 'atk' },
-  { name: '무적',       desc: '5초간 데미지 무효',   cost: 100, icon: '✨', kind: 'buff', buffType: 'invincible' },
-];
-
-interface DoorDef {
-  type: string; icon: string; name: string; desc: string; color: number;
-}
-const DOOR_DEFS: DoorDef[] = [
-  { type: 'combat', icon: '⚔️', name: '전투', desc: '일반 몬스터 웨이브', color: 0x4466aa },
-  { type: 'elite',  icon: '⚡', name: '엘리트', desc: '강한 몬스터 (보상 x2)', color: 0xcc6622 },
-  { type: 'shop',   icon: '🏪', name: '상점', desc: '아이템 구매', color: 0x44aa66 },
-  { type: 'rest',   icon: '🔥', name: '휴식', desc: 'HP 30% 회복 + 카드 강화', color: 0xcc8833 },
-  { type: 'event',  icon: '🎲', name: '이벤트', desc: '랜덤 이벤트', color: 0x8844aa },
-];
-
-interface EventDef {
-  id: string; name: string; icon: string; desc: string; effect: string;
-}
-const EVENTS: EventDef[] = [
-  { id: 'spring', name: '신비한 샘', icon: '🌊', desc: '맑은 샘물이 반짝이고 있다...', effect: 'HP 완전 회복, 최대 HP -20' },
-  { id: 'devil', name: '악마의 거래', icon: '😈', desc: '어둠 속에서 악마가 나타났다...', effect: 'ATK +5, 골드 50% 감소' },
-  { id: 'relic_find', name: '고대 유물 발견', icon: '🏺', desc: '고대 유물을 발견했다!', effect: '유물 포인트 +2' },
-  { id: 'curse', name: '저주받은 몬스터', icon: '👹', desc: '저주의 기운이 다가온다...', effect: '다음 전투 몬스터 ATK x2' },
-  { id: 'bless', name: '축복받은 전사', icon: '✨', desc: '성스러운 빛이 감싼다...', effect: '다음 전투까지 ATK +10' },
-];
-
-/* ---- card rarity ---- */
-
-type CardRarity = 'normal' | 'rare' | 'legendary';
-
 function rollRarity(): CardRarity {
   const r = Math.random();
   if (r < 0.05) return 'legendary';
-  if (r < 0.20) return 'rare';
+  if (r < 0.2) return 'rare';
   return 'normal';
 }
-
-const RARITY_COLORS: Record<CardRarity, { border: number; text: string; label: string; bg: number }> = {
-  normal:    { border: 0x666688, text: '#aaaaaa', label: '일반', bg: 0x111122 },
-  rare:      { border: 0x4488ff, text: '#4488ff', label: '희귀', bg: 0x0a1530 },
-  legendary: { border: 0xffd700, text: '#ffd700', label: '전설', bg: 0x1a1500 },
-};
-
-const LEGENDARY_DESCS: Record<string, string> = {
-  hp:    '매 스테이지 HP 5 자동 회복',
-  atk:   '크리티컬 확률 +15%',
-  spd:   '공격 시 10% 확률로 2연타',
-  steal: '처치 시 HP 10 회복',
-  crit:  '크리티컬 데미지 3배',
-};
-
-/* ---- synergy system ---- */
-
-interface SynergyDef {
-  id: string; name: string; icon: string;
-  requires: string[]; desc: string;
-}
-
-const SYNERGIES: SynergyDef[] = [
-  { id: 'iron_guard', name: '철벽 수호자', icon: '❤🛡', requires: ['hp', 'def'], desc: '최대 HP +30, 피해 -10%' },
-  { id: 'death_touch', name: '죽음의 손길', icon: '🎯🩸', requires: ['crit', 'steal'], desc: '치명타 시 HP 20 회복' },
-  { id: 'berserker', name: '광전사', icon: '⚔💨', requires: ['atk', 'spd'], desc: 'ATK +5, 공격속도 +10%' },
-  { id: 'survivor', name: '생존자', icon: '❤🩸', requires: ['hp', 'steal'], desc: 'HP 15% 이하 시 흡혈 2배' },
-  { id: 'glass_cannon', name: '유리 대포', icon: '⚔🎯', requires: ['atk', 'crit'], desc: '크리티컬 데미지 +50%' },
-  { id: 'tank', name: '철의 심장', icon: '🛡💨', requires: ['def', 'spd'], desc: '피격 시 5% 확률로 반격' },
-];
-
-/* ---- auto-attack cards ---- */
-
-interface AutoAtkCardDef {
-  classId: string; name: string; icon: string; desc: string; color: number;
-}
-
-const AUTO_ATK_CARDS: Record<string, AutoAtkCardDef> = {
-  warrior: { classId: 'warrior', name: '전투 본능', icon: '⚔️🔄', desc: '기본 공격이 자동으로 발동됩니다', color: 0xcc4422 },
-  mage: { classId: 'mage', name: '마법 자동화', icon: '🔮🔄', desc: '마법탄이 자동으로 발사됩니다', color: 0x4488ff },
-  rogue: { classId: 'rogue', name: '암살자의 리듬', icon: '🗡️🔄', desc: '쌍검이 자동으로 공격합니다', color: 0x9944cc },
-};
-
-/* ---- skill multiplier (data-driven) ---- */
 
 function skillMult(id: string, level: number): number {
   if (level <= 0) return 0;
@@ -148,52 +95,9 @@ function skillCdCalc(id: string, level: number, cdReduction: number): number {
   return def.baseCd * Math.pow(0.85, Math.max(0, level - 1)) * cdReduction;
 }
 
-/* ---- balance constants ---- */
-
-const INIT_HP = 100;
-const INIT_ATK = 4;
-const INIT_ATK_INTERVAL_MS = 1200;
-const MIN_ATK_INTERVAL_MS = 300;
-const INIT_MP = 80;
-const MP_REGEN_PER_SEC = 0.3;
-
-const MON_BASE_HP = 40;
-const MON_HP_GROWTH = 1.08;
-const MON_BASE_ATK = 6;
-const MON_ATK_GROWTH = 1.06;
-const MON_ATK_INTERVAL_NORMAL = 2500;
-const MON_ATK_INTERVAL_MINI = 2000;
-const MON_ATK_INTERVAL_FINAL = 1500;
-
-/* ---- layout constants ---- */
-
-const SHOP_BTN = { x: 330, y: 560, w: 160, h: 36 } as const;
-const RELIC_BTN = { x: 510, y: 560, w: 160, h: 36 } as const;
-const HP_BAR = { x: 535, y: 62, w: 235, h: 18 } as const;
-const MP_BAR = { x: 535, y: 86, w: 235, h: 10 } as const;
-const XP_BAR = { x: 335, y: 42, w: 130, h: 5 } as const;
-
-const MAIN_MON_POS = { x: 400, y: 230 };
-const SUB_MON_POSITIONS = [
-  { x: 200, y: 360 },
-  { x: 600, y: 360 },
-  { x: 300, y: 395 },
-  { x: 500, y: 395 },
-];
-
-const MAX_SLOTS = 4;
-const SLOT_W = 62, SLOT_H = 55, SLOT_Y = 478;
-const SLOT_XS = Array.from({ length: MAX_SLOTS }, (_, i) => 270 + i * 68);
-
-const QSLOT_W = 52, QSLOT_H = 52, QSLOT_Y = SLOT_Y;
-const QSLOT_XS = [78, 142];
-
-interface QuickSlotData { potionLv: number; count: number }
-
 /* ================================================================ */
 
 export class GameScene extends Phaser.Scene {
-
   /* ---- state ---- */
 
   private gold = 0;
@@ -402,7 +306,9 @@ export class GameScene extends Phaser.Scene {
   private startRegion = 1;
   private selectedClass: ClassDef = CLASSES[0];
 
-  constructor() { super({ key: 'GameScene' }); }
+  constructor() {
+    super({ key: 'GameScene' });
+  }
 
   private loadingRun = false;
 
@@ -414,8 +320,12 @@ export class GameScene extends Phaser.Scene {
 
   /* ---- persistent registry helpers ---- */
 
-  private get relicPoints(): number { return this.registry.get('relicPoints') ?? 0; }
-  private set relicPointsVal(v: number) { this.registry.set('relicPoints', v); }
+  private get relicPoints(): number {
+    return this.registry.get('relicPoints') ?? 0;
+  }
+  private set relicPointsVal(v: number) {
+    this.registry.set('relicPoints', v);
+  }
 
   private get relicLevels(): Record<string, number> {
     const stored = this.registry.get('relicLevels');
@@ -427,14 +337,24 @@ export class GameScene extends Phaser.Scene {
     this.registry.set('relicLevels', cur);
   }
 
-  private get prestigeCount(): number { return this.registry.get('prestigeCount') ?? 0; }
-  private get goldMultiplier(): number { return 1 + this.prestigeCount * 0.2; }
+  private get prestigeCount(): number {
+    return this.registry.get('prestigeCount') ?? 0;
+  }
+  private get goldMultiplier(): number {
+    return 1 + this.prestigeCount * 0.2;
+  }
 
   /* ---- computed: region ---- */
 
-  private get currentRegion(): number { return Math.min(REGIONS.length, Math.ceil(this.stage / 20)); }
-  private get localStage(): number { return ((this.stage - 1) % 20) + 1; }
-  private get regionDef(): RegionDef { return REGIONS[Math.min(REGIONS.length - 1, this.currentRegion - 1)]; }
+  private get currentRegion(): number {
+    return Math.min(REGIONS.length, Math.ceil(this.stage / 20));
+  }
+  private get localStage(): number {
+    return ((this.stage - 1) % 20) + 1;
+  }
+  private get regionDef(): RegionDef {
+    return REGIONS[Math.min(REGIONS.length - 1, this.currentRegion - 1)];
+  }
 
   /* ---- computed: stats ---- */
 
@@ -446,7 +366,9 @@ export class GameScene extends Phaser.Scene {
   private getSkillMult(id: string): number {
     return skillMult(id, this.skillLevels[id] ?? 0);
   }
-  private hasSynergy(id: string): boolean { return this.activeSynergies.includes(id); }
+  private hasSynergy(id: string): boolean {
+    return this.activeSynergies.includes(id);
+  }
   private skillCd(id: string): number {
     return skillCdCalc(id, this.skillLevels[id] ?? 0, this.cooldownReduction);
   }
@@ -454,18 +376,28 @@ export class GameScene extends Phaser.Scene {
     return skillCdCalc(id, level, this.cooldownReduction);
   }
 
-  private get markMult(): number { return this.deathMarks.length >= 5 ? 2 : 1; }
+  private get markMult(): number {
+    return this.deathMarks.length >= 5 ? 2 : 1;
+  }
   private markCount(id: MarkId): number {
     return this.deathMarks.filter(m => m === id).length * this.markMult;
   }
 
   private get baseMaxHp(): number {
-    return this.selectedClass.hp + this.relicLevels.heart * 30 - this.relicLevels.dark * 20
-      - this.markCount('dark') * 15;
+    return (
+      this.selectedClass.hp +
+      this.relicLevels.heart * 30 -
+      this.relicLevels.dark * 20 -
+      this.markCount('dark') * 15
+    );
   }
   private get baseAtk(): number {
-    return this.selectedClass.atk + this.relicLevels.warrior * 2 + this.relicLevels.dark * 5
-      + this.markCount('dark') * 3;
+    return (
+      this.selectedClass.atk +
+      this.relicLevels.warrior * 2 +
+      this.relicLevels.dark * 5 +
+      this.markCount('dark') * 3
+    );
   }
 
   private get effectiveAtk(): number {
@@ -481,8 +413,8 @@ export class GameScene extends Phaser.Scene {
   private get critChance(): number {
     let c = this.gcv('crit') / 100 + this.relicLevels.eye * 0.05;
     if (this.legendaryEffects.atk) c += 0.15;
-    if (this.legendaryEffects.crit) c += 0.20;
-    if (this.selectedClass.id === 'rogue') c += 0.20;
+    if (this.legendaryEffects.crit) c += 0.2;
+    if (this.selectedClass.id === 'rogue') c += 0.2;
     c += this.tempCritBonus;
     c += this.markCount('despair') * 0.15;
     if (this.stealthGuaranteeCrit) c = 1;
@@ -495,10 +427,10 @@ export class GameScene extends Phaser.Scene {
   }
   private get defenseRate(): number {
     let d = this.gcv('def') / 100 + this.relicLevels.shield * 0.05;
-    if (this.hasSynergy('iron_guard')) d += 0.10;
+    if (this.hasSynergy('iron_guard')) d += 0.1;
     if (this.selectedClass.id === 'warrior') d += 0.15;
     d += this.shieldDmgReduce;
-    d -= this.markCount('fear') * 0.10;
+    d -= this.markCount('fear') * 0.1;
     d -= this.bossDefenseReduction;
     return Math.min(Math.max(d, -0.5), 0.9);
   }
@@ -516,19 +448,29 @@ export class GameScene extends Phaser.Scene {
     base *= Math.pow(0.8, this.markCount('madness'));
     return Math.max(MIN_ATK_INTERVAL_MS, base);
   }
-  private get attacksPerSec(): number { return 1000 / this.attackIntervalMs; }
-  private get xpMultiplier(): number { return 1 + this.relicLevels.sage * 0.15; }
+  private get attacksPerSec(): number {
+    return 1000 / this.attackIntervalMs;
+  }
+  private get xpMultiplier(): number {
+    return 1 + this.relicLevels.sage * 0.15;
+  }
 
   private get goldDropMultiplier(): number {
-    return this.goldMultiplier * (1 + this.relicLevels.gold_touch * 0.2) * (1 + this.markCount('fear') * 0.3);
+    return (
+      this.goldMultiplier *
+      (1 + this.relicLevels.gold_touch * 0.2) *
+      (1 + this.markCount('fear') * 0.3)
+    );
   }
-  private get shopDiscount(): number { return 1 - this.relicLevels.merchant * 0.1; }
+  private get shopDiscount(): number {
+    return 1 - this.relicLevels.merchant * 0.1;
+  }
   private get potionMultiplier(): number {
     return (1 + this.relicLevels.spring * 0.25) * (1 - this.markCount('despair') * 0.2);
   }
   private get skillDamageMult(): number {
     let m = 1 + this.relicLevels.mana * 0.15;
-    if (this.selectedClass.id === 'mage') m += 0.30;
+    if (this.selectedClass.id === 'mage') m += 0.3;
     m += this.markCount('curse') * 0.25;
     if (this.manaOverloadActive) m *= 3;
     if (this.overdriveActive) {
@@ -539,12 +481,12 @@ export class GameScene extends Phaser.Scene {
   }
   private get mpRegenRate(): number {
     let rate = MP_REGEN_PER_SEC * (1 + this.relicLevels.mana_spring * 0.2);
-    rate *= (1 - this.markCount('curse') * 0.2);
+    rate *= 1 - this.markCount('curse') * 0.2;
     return Math.max(0.5, rate);
   }
   private get cooldownReduction(): number {
     let r = 1 - this.relicLevels.time * 0.1;
-    if (this.selectedClass.id === 'mage') r *= 0.80;
+    if (this.selectedClass.id === 'mage') r *= 0.8;
     return r;
   }
 
@@ -585,7 +527,9 @@ export class GameScene extends Phaser.Scene {
     this.createQuickSlots();
     this.createSkillSlots();
     this.relicPanel = new RelicPanel(this, {
-      onClose: () => { this.relicOpen = false; },
+      onClose: () => {
+        this.relicOpen = false;
+      },
       onUpgrade: () => this.updateUI(),
     });
 
@@ -596,7 +540,10 @@ export class GameScene extends Phaser.Scene {
     this.input.keyboard?.on('keydown-E', () => this.onSkillActivate(2));
     this.input.keyboard?.on('keydown-R', () => this.onSkillActivate(3));
     this.input.keyboard?.on('keydown-ENTER', () => this.tryActivateOverdrive());
-    this.input.keyboard?.on('keydown-TAB', (e: KeyboardEvent) => { e.preventDefault(); this.cycleTarget(); });
+    this.input.keyboard?.on('keydown-TAB', (e: KeyboardEvent) => {
+      e.preventDefault();
+      this.cycleTarget();
+    });
     this.input.keyboard?.on('keydown-ESC', () => this.togglePauseMenu());
     this.input.keyboard?.on('keydown-F9', () => this.toggleCheatInvincible());
     this.input.keyboard?.on('keydown-F10', () => this.toggleCheatAtk());
@@ -692,7 +639,10 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawAtkGauge(ratio: number) {
-    const gx = 30, gy = 178, gw = 160, gh = 6;
+    const gx = 30,
+      gy = 178,
+      gw = 160,
+      gh = 6;
     this.atkGaugeFill.clear();
     const fw = gw * ratio;
     if (fw <= 0) return;
@@ -709,7 +659,10 @@ export class GameScene extends Phaser.Scene {
     this.stage = (this.startRegion - 1) * 20 + 1;
     this.highestStageCleared = 0;
     this.regionBossesKilled = 0;
-    this.level = 1; this.xp = 0; this.xpToNext = 30 + 1 * 15; this.pendingLevelUps = 0;
+    this.level = 1;
+    this.xp = 0;
+    this.xpToNext = 30 + 1 * 15;
+    this.pendingLevelUps = 0;
     this.cardLevels = { hp: 0, atk: 0, spd: 0, crit: 0, def: 0, steal: 0, mp: 0 };
     this.skillLevels = {};
     this.equippedSkills = [];
@@ -718,7 +671,10 @@ export class GameScene extends Phaser.Scene {
       this.skillLevels[basicSkill.id] = 1;
       this.equippedSkills.push(basicSkill.id);
     }
-    this.quickSlots = [{ potionLv: 1, count: 2 }, { potionLv: 0, count: 0 }];
+    this.quickSlots = [
+      { potionLv: 1, count: 2 },
+      { potionLv: 0, count: 0 },
+    ];
     if (this.selectedClass.id === 'warrior') {
       this.quickSlots[0] = { potionLv: 1, count: 3 };
     } else if (this.selectedClass.id === 'rogue') {
@@ -733,15 +689,30 @@ export class GameScene extends Phaser.Scene {
     this.autoAttackEnabled = false;
     this.attackSeqActive = false;
     this.chargeTimers = [];
-    this.atkBuffActive = false; this.invincible = false;
-    this.gameOver = false; this.cardSelecting = false; this.shopOpen = false; this.relicOpen = false;
-    this.waveTotal = 0; this.waveCurrent = 0; this.waveXpAccum = 0;
-    this.monsters = []; this.targetMonster = null;
-    this.stageType = 'combat'; this.doorSelecting = false; this.isEliteStage = false;
-    this.nextCombatCursed = false; this.tempEventAtkBuff = 0; this.hasRevived = false;
-    this.shopFromDoor = false; this.restCardPending = false;
-    this.pendingStageClear = false; this.pendingStageClearBoss = false;
-    this.waveClearing = false; this.pauseOpen = false; this.waitingFirstCard = false;
+    this.atkBuffActive = false;
+    this.invincible = false;
+    this.gameOver = false;
+    this.cardSelecting = false;
+    this.shopOpen = false;
+    this.relicOpen = false;
+    this.waveTotal = 0;
+    this.waveCurrent = 0;
+    this.waveXpAccum = 0;
+    this.monsters = [];
+    this.targetMonster = null;
+    this.stageType = 'combat';
+    this.doorSelecting = false;
+    this.isEliteStage = false;
+    this.nextCombatCursed = false;
+    this.tempEventAtkBuff = 0;
+    this.hasRevived = false;
+    this.shopFromDoor = false;
+    this.restCardPending = false;
+    this.pendingStageClear = false;
+    this.pendingStageClearBoss = false;
+    this.waveClearing = false;
+    this.pauseOpen = false;
+    this.waitingFirstCard = false;
     this.cardRarityBonus = {};
     this.legendaryEffects = {};
     this.activeSynergies = [];
@@ -749,39 +720,66 @@ export class GameScene extends Phaser.Scene {
     this.achData = SaveManager.loadAchievements();
     this.potionUsedThisRun = false;
     this.bossHitThisRun = false;
-    this.poisonTimer = undefined; this.bossSpecialTimer = undefined;
-    this.bossRageTimer = undefined; this.bossRageLevel = 0;
-    this.bossPatternTimer = undefined; this.bossPatternWarning = undefined;
-    this.bossDefenseReduction = 0; this.bossDefenseTimer = undefined;
-    this.skillSealed = false; this.skillSealTimer = undefined;
+    this.poisonTimer = undefined;
+    this.bossSpecialTimer = undefined;
+    this.bossRageTimer = undefined;
+    this.bossRageLevel = 0;
+    this.bossPatternTimer = undefined;
+    this.bossPatternWarning = undefined;
+    this.bossDefenseReduction = 0;
+    this.bossDefenseTimer = undefined;
+    this.skillSealed = false;
+    this.skillSealTimer = undefined;
     this.monsterAttackTimer = undefined;
-    this.stealthActive = false; this.stealthGuaranteeCrit = false;
-    this.reflectActive = false; this.reflectPct = 0;
-    this.dodgeChance = 0; this.warcryActive = false;
-    this.manaOverloadActive = false; this.monsterStunned = false;
-    this.monsterWeakened = false; this.monsterWeakenPct = 0;
-    this.monsterFrozen = false; this.shieldDmgReduce = 0;
-    this.shadowCloneActive = false; this.shadowCloneMult = 0;
-    this.dotTimers = []; this.tempCritBonus = 0;
+    this.stealthActive = false;
+    this.stealthGuaranteeCrit = false;
+    this.reflectActive = false;
+    this.reflectPct = 0;
+    this.dodgeChance = 0;
+    this.warcryActive = false;
+    this.manaOverloadActive = false;
+    this.monsterStunned = false;
+    this.monsterWeakened = false;
+    this.monsterWeakenPct = 0;
+    this.monsterFrozen = false;
+    this.shieldDmgReduce = 0;
+    this.shadowCloneActive = false;
+    this.shadowCloneMult = 0;
+    this.dotTimers = [];
+    this.tempCritBonus = 0;
     this.mpWarningShown = false;
     this.currentBossType = 'none';
     this.overdriveGauge = 0;
     this.overdriveActive = false;
     this.overdriveFever = false;
     this.comboCount = 0;
-    this.emergencyDefCd = 0; this.emergencyDefActive = false;
-    this.parryReady = true; this.parryCd = 0;
-    this.parryWindowOpen = false; this.parryWindowOpenTime = 0;
-    this.parryAttempted = false; this.parryEarlyFailed = false;
-    this.parrySuccessCount = 0; this.parryMasteryLevel = 0;
-    this.parryIsFakePhase = false; this.parryFakeCompleted = false;
-    this.parryMultiHitQueue = []; this.parryMultiHitSuccesses = 0;
+    this.emergencyDefCd = 0;
+    this.emergencyDefActive = false;
+    this.parryReady = true;
+    this.parryCd = 0;
+    this.parryWindowOpen = false;
+    this.parryWindowOpenTime = 0;
+    this.parryAttempted = false;
+    this.parryEarlyFailed = false;
+    this.parrySuccessCount = 0;
+    this.parryMasteryLevel = 0;
+    this.parryIsFakePhase = false;
+    this.parryFakeCompleted = false;
+    this.parryMultiHitQueue = [];
+    this.parryMultiHitSuccesses = 0;
     this.bossAttackIncoming = false;
-    this.mageBarrierActive = false; this.mageBarrierAbsorb = 0;
-    this.roguePostDodgeActive = false; this.roguePostDodgeTimer = undefined;
-    this.totalKills = 0; this.totalGoldEarned = 0;
-    this.emptySlotGfx = []; this.skillButtons = [];
-    this.qSlotBgs = []; this.qSlotIcons = []; this.qSlotLvTexts = []; this.qSlotCounts = [];
+    this.mageBarrierActive = false;
+    this.mageBarrierAbsorb = 0;
+    this.roguePostDodgeActive = false;
+    this.roguePostDodgeTimer = undefined;
+    this.totalKills = 0;
+    this.totalGoldEarned = 0;
+    this.emptySlotGfx = [];
+    this.skillButtons = [];
+    this.qSlotBgs = [];
+    this.qSlotIcons = [];
+    this.qSlotLvTexts = [];
+    this.qSlotCounts = [];
     this.bossBgOverlay = undefined;
     this.overlayElements = [];
     this.pauseElements = [];
@@ -801,10 +799,14 @@ export class GameScene extends Phaser.Scene {
     this.bgGraphics.clear();
     this.bgGraphics.fillGradientStyle(r.bgTop, r.bgTop, r.bgBot, r.bgBot, 1, 1, 1, 1);
     this.bgGraphics.fillRect(0, 0, 800, 600);
-    this.bgGraphics.fillStyle(r.panelColor, 0.25); this.bgGraphics.fillRect(0, 430, 800, 170);
-    this.bgGraphics.lineStyle(1, 0x1a5276, 0.4); this.bgGraphics.lineBetween(0, 430, 800, 430);
-    this.bgGraphics.fillStyle(0xffffff, 0.04); this.bgGraphics.fillCircle(400, 300, 160);
-    this.bgGraphics.fillStyle(0xffffff, 0.03); this.bgGraphics.fillCircle(400, 300, 120);
+    this.bgGraphics.fillStyle(r.panelColor, 0.25);
+    this.bgGraphics.fillRect(0, 430, 800, 170);
+    this.bgGraphics.lineStyle(1, 0x1a5276, 0.4);
+    this.bgGraphics.lineBetween(0, 430, 800, 430);
+    this.bgGraphics.fillStyle(0xffffff, 0.04);
+    this.bgGraphics.fillCircle(400, 300, 160);
+    this.bgGraphics.fillStyle(0xffffff, 0.03);
+    this.bgGraphics.fillCircle(400, 300, 120);
   }
 
   private showBossBackground(isFinal: boolean) {
@@ -818,8 +820,12 @@ export class GameScene extends Phaser.Scene {
     this.bossBgOverlay.lineStyle(2, bc, 0.2);
     this.bossBgOverlay.strokeRect(8, 8, 784, 584);
     this.tweens.add({
-      targets: this.bossBgOverlay, alpha: 0.6, duration: 800,
-      yoyo: true, repeat: -1, ease: 'Sine.easeInOut',
+      targets: this.bossBgOverlay,
+      alpha: 0.6,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
     });
   }
 
@@ -833,40 +839,84 @@ export class GameScene extends Phaser.Scene {
      ================================================================ */
 
   private createUI() {
-    this.stageText = this.add.text(400, 14, '', {
-      fontSize: '18px', color: '#ffffff', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 4,
-    }).setOrigin(0.5, 0.5).setDepth(50);
+    this.stageText = this.add
+      .text(400, 14, '', {
+        fontSize: '18px',
+        color: '#ffffff',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(50);
 
-    this.waveText = this.add.text(HP_BAR.x + HP_BAR.w / 2, HP_BAR.y + HP_BAR.h + 12, '', {
-      fontSize: '13px', color: '#99aacc', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5, 0.5).setDepth(50);
+    this.waveText = this.add
+      .text(HP_BAR.x + HP_BAR.w / 2, HP_BAR.y + HP_BAR.h + 12, '', {
+        fontSize: '13px',
+        color: '#99aacc',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(50);
 
-    this.goldText = this.add.text(30, 68, '', {
-      fontSize: '20px', color: '#ffd700', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-    }).setDepth(50);
+    this.goldText = this.add
+      .text(30, 68, '', {
+        fontSize: '20px',
+        color: '#ffd700',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setDepth(50);
 
-    this.relicPtsText = this.add.text(770, 22, '', {
-      fontSize: '14px', color: '#cc88ff', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(1, 0.5).setDepth(50);
+    this.relicPtsText = this.add
+      .text(770, 22, '', {
+        fontSize: '14px',
+        color: '#cc88ff',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(1, 0.5)
+      .setDepth(50);
 
-    this.statsLine1 = this.add.text(30, 94, '', {
-      fontSize: '18px', color: '#ffffff', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-    }).setDepth(50);
+    this.statsLine1 = this.add
+      .text(30, 94, '', {
+        fontSize: '18px',
+        color: '#ffffff',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setDepth(50);
 
-    this.statsLine2 = this.add.text(30, 118, '', {
-      fontSize: '16px', color: '#66ccff', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-    }).setDepth(50);
+    this.statsLine2 = this.add
+      .text(30, 118, '', {
+        fontSize: '16px',
+        color: '#66ccff',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setDepth(50);
 
-    this.bonusText = this.add.text(30, 142, '', {
-      fontSize: '14px', color: '#aaaaaa', fontFamily: 'Arial, sans-serif',
-      stroke: '#000000', strokeThickness: 2,
-    }).setDepth(50);
+    this.bonusText = this.add
+      .text(30, 142, '', {
+        fontSize: '14px',
+        color: '#aaaaaa',
+        fontFamily: 'Arial, sans-serif',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setDepth(50);
 
     this.atkGaugeFill = this.add.graphics().setDepth(50);
 
@@ -875,13 +925,23 @@ export class GameScene extends Phaser.Scene {
     classIconBg.fillRoundedRect(726, 38, 44, 44, 8);
     classIconBg.lineStyle(2, this.selectedClass.borderColor, 0.9);
     classIconBg.strokeRoundedRect(726, 38, 44, 44, 8);
-    this.add.text(748, 52, this.selectedClass.icon, {
-      fontSize: '22px',
-    }).setOrigin(0.5).setDepth(50);
-    this.add.text(748, 72, this.selectedClass.name, {
-      fontSize: '9px', color: '#cccccc', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(50);
+    this.add
+      .text(748, 52, this.selectedClass.icon, {
+        fontSize: '22px',
+      })
+      .setOrigin(0.5)
+      .setDepth(50);
+    this.add
+      .text(748, 72, this.selectedClass.name, {
+        fontSize: '9px',
+        color: '#cccccc',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(50);
 
     this.createMarkDisplay();
     this.updateUI();
@@ -890,7 +950,8 @@ export class GameScene extends Phaser.Scene {
   private createMarkDisplay() {
     if (this.deathMarks.length === 0) return;
     const isCursed = this.deathMarks.length >= 5;
-    const startX = 30, startY = 200;
+    const startX = 30,
+      startY = 200;
     const markBg = this.add.graphics().setDepth(49);
     markBg.fillStyle(isCursed ? 0x330000 : 0x111122, 0.6);
     markBg.fillRoundedRect(startX - 4, startY - 4, this.deathMarks.length * 22 + 8, 24, 6);
@@ -901,27 +962,46 @@ export class GameScene extends Phaser.Scene {
     }
     this.deathMarks.forEach((markId, i) => {
       const md = MARK_DEFS[markId];
-      this.add.text(startX + i * 22 + 8, startY + 8, md.icon, {
-        fontSize: '14px',
-      }).setOrigin(0.5).setDepth(50);
+      this.add
+        .text(startX + i * 22 + 8, startY + 8, md.icon, {
+          fontSize: '14px',
+        })
+        .setOrigin(0.5)
+        .setDepth(50);
     });
     if (isCursed) {
-      this.add.text(startX + this.deathMarks.length * 22 + 12, startY + 8, '저주받은 자', {
-        fontSize: '9px', color: '#ff4444', fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0, 0.5).setDepth(50);
+      this.add
+        .text(startX + this.deathMarks.length * 22 + 12, startY + 8, '저주받은 자', {
+          fontSize: '9px',
+          color: '#ff4444',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0, 0.5)
+        .setDepth(50);
     }
   }
 
   private createXpBar() {
     const { x, y, w, h } = XP_BAR;
-    this.xpLevelText = this.add.text(x + w / 2, y - 8, '', {
-      fontSize: '11px', color: '#88ccff', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5, 0.5).setDepth(52);
+    this.xpLevelText = this.add
+      .text(x + w / 2, y - 8, '', {
+        fontSize: '11px',
+        color: '#88ccff',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(52);
     const bg = this.add.graphics().setDepth(50);
-    bg.fillStyle(0x000000, 0.5); bg.fillRoundedRect(x - 2, y - 2, w + 4, h + 4, 4);
-    bg.fillStyle(0x222233, 1); bg.fillRoundedRect(x, y, w, h, 3);
+    bg.fillStyle(0x000000, 0.5);
+    bg.fillRoundedRect(x - 2, y - 2, w + 4, h + 4, 4);
+    bg.fillStyle(0x222233, 1);
+    bg.fillRoundedRect(x, y, w, h, 3);
     this.xpBarFill = this.add.graphics().setDepth(51);
     this.drawXpBar();
   }
@@ -940,30 +1020,60 @@ export class GameScene extends Phaser.Scene {
 
   private createPlayerHpBar() {
     const { x, y, w, h } = HP_BAR;
-    this.add.text(x - 28, y + h / 2, '♥', {
-      fontSize: '20px', color: '#ff4444', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(50);
+    this.add
+      .text(x - 28, y + h / 2, '♥', {
+        fontSize: '20px',
+        color: '#ff4444',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(50);
     this.playerHpBg = this.add.graphics().setDepth(50);
-    this.playerHpBg.fillStyle(0x000000, 0.6); this.playerHpBg.fillRoundedRect(x - 3, y - 3, w + 6, h + 6, 7);
-    this.playerHpBg.fillStyle(0x331111, 1); this.playerHpBg.fillRoundedRect(x, y, w, h, 5);
+    this.playerHpBg.fillStyle(0x000000, 0.6);
+    this.playerHpBg.fillRoundedRect(x - 3, y - 3, w + 6, h + 6, 7);
+    this.playerHpBg.fillStyle(0x331111, 1);
+    this.playerHpBg.fillRoundedRect(x, y, w, h, 5);
     this.playerHpFill = this.add.graphics().setDepth(51);
-    this.playerHpText = this.add.text(x + w / 2, y + h / 2, '', {
-      fontSize: '11px', color: '#ffffff', fontFamily: 'Arial',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(52);
+    this.playerHpText = this.add
+      .text(x + w / 2, y + h / 2, '', {
+        fontSize: '11px',
+        color: '#ffffff',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(52);
 
     const mb = MP_BAR;
-    this.add.text(mb.x - 28, mb.y + mb.h / 2, '◆', {
-      fontSize: '14px', color: '#4488ff', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(50);
+    this.add
+      .text(mb.x - 28, mb.y + mb.h / 2, '◆', {
+        fontSize: '14px',
+        color: '#4488ff',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(50);
     const mpBg = this.add.graphics().setDepth(50);
-    mpBg.fillStyle(0x000000, 0.6); mpBg.fillRoundedRect(mb.x - 2, mb.y - 2, mb.w + 4, mb.h + 4, 5);
-    mpBg.fillStyle(0x111133, 1); mpBg.fillRoundedRect(mb.x, mb.y, mb.w, mb.h, 4);
+    mpBg.fillStyle(0x000000, 0.6);
+    mpBg.fillRoundedRect(mb.x - 2, mb.y - 2, mb.w + 4, mb.h + 4, 5);
+    mpBg.fillStyle(0x111133, 1);
+    mpBg.fillRoundedRect(mb.x, mb.y, mb.w, mb.h, 4);
     this.playerMpFill = this.add.graphics().setDepth(51);
-    this.playerMpText = this.add.text(mb.x + mb.w / 2, mb.y + mb.h / 2, '', {
-      fontSize: '8px', color: '#aaddff', fontFamily: 'Arial',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 1,
-    }).setOrigin(0.5).setDepth(52);
+    this.playerMpText = this.add
+      .text(mb.x + mb.w / 2, mb.y + mb.h / 2, '', {
+        fontSize: '8px',
+        color: '#aaddff',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 1,
+      })
+      .setOrigin(0.5)
+      .setDepth(52);
 
     this.drawPlayerHpBar();
     this.drawMpBar();
@@ -1008,15 +1118,29 @@ export class GameScene extends Phaser.Scene {
   private mpWarningShown = false;
 
   private showMpWarning(_skillName: string, _cost: number) {
-    const msg = this.add.text(400, 280, '마나부족', {
-      fontSize: '32px', color: '#6699ff', fontFamily: 'Arial',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(300).setAlpha(0);
+    const msg = this.add
+      .text(400, 280, '마나부족', {
+        fontSize: '32px',
+        color: '#6699ff',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(300)
+      .setAlpha(0);
     this.tweens.add({
-      targets: msg, alpha: 1, duration: 150,
+      targets: msg,
+      alpha: 1,
+      duration: 150,
       onComplete: () => {
         this.tweens.add({
-          targets: msg, alpha: 0, y: 260, delay: 1800, duration: 200,
+          targets: msg,
+          alpha: 0,
+          y: 260,
+          delay: 1800,
+          duration: 200,
           onComplete: () => msg.destroy(),
         });
       },
@@ -1028,7 +1152,14 @@ export class GameScene extends Phaser.Scene {
     const flash = this.add.graphics().setDepth(100);
     flash.fillStyle(0xff2222, 0.6);
     flash.fillRoundedRect(x, y, w, h, 4);
-    this.tweens.add({ targets: flash, alpha: 0, duration: 400, yoyo: true, repeat: 1, onComplete: () => flash.destroy() });
+    this.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 400,
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => flash.destroy(),
+    });
   }
 
   private checkLowMpWarning() {
@@ -1047,28 +1178,66 @@ export class GameScene extends Phaser.Scene {
      ================================================================ */
 
   private createQuickSlots() {
-    this.add.text(110, QSLOT_Y - 34, 'ITEM', {
-      fontSize: '10px', color: '#777788', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(48);
+    this.add
+      .text(110, QSLOT_Y - 34, 'ITEM', {
+        fontSize: '10px',
+        color: '#777788',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(48);
     for (let i = 0; i < 2; i++) {
       const x = QSLOT_XS[i];
       this.qSlotBgs.push(this.add.graphics().setDepth(49));
-      this.qSlotIcons.push(this.add.text(x, QSLOT_Y - 6, '', { fontSize: '20px' }).setOrigin(0.5).setDepth(51));
-      this.qSlotLvTexts.push(this.add.text(x, QSLOT_Y + 14, '', {
-        fontSize: '9px', color: '#cccccc', fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0.5).setDepth(51));
-      this.qSlotCounts.push(this.add.text(x + QSLOT_W / 2 - 4, QSLOT_Y + QSLOT_H / 2 - 4, '', {
-        fontSize: '12px', color: '#ffffff', fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 3,
-      }).setOrigin(1, 1).setDepth(52));
-      this.add.text(x - QSLOT_W / 2 + 4, QSLOT_Y - QSLOT_H / 2 + 2, `${i + 1}`, {
-        fontSize: '9px', color: '#aaaacc', fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 2,
-      }).setDepth(52);
-      const zone = this.add.zone(x, QSLOT_Y, QSLOT_W, QSLOT_H)
-        .setInteractive({ useHandCursor: true }).setDepth(53);
+      this.qSlotIcons.push(
+        this.add
+          .text(x, QSLOT_Y - 6, '', { fontSize: '20px' })
+          .setOrigin(0.5)
+          .setDepth(51),
+      );
+      this.qSlotLvTexts.push(
+        this.add
+          .text(x, QSLOT_Y + 14, '', {
+            fontSize: '9px',
+            color: '#cccccc',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5)
+          .setDepth(51),
+      );
+      this.qSlotCounts.push(
+        this.add
+          .text(x + QSLOT_W / 2 - 4, QSLOT_Y + QSLOT_H / 2 - 4, '', {
+            fontSize: '12px',
+            color: '#ffffff',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 3,
+          })
+          .setOrigin(1, 1)
+          .setDepth(52),
+      );
+      this.add
+        .text(x - QSLOT_W / 2 + 4, QSLOT_Y - QSLOT_H / 2 + 2, `${i + 1}`, {
+          fontSize: '9px',
+          color: '#aaaacc',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setDepth(52);
+      const zone = this.add
+        .zone(x, QSLOT_Y, QSLOT_W, QSLOT_H)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(53);
       zone.on('pointerdown', () => this.useQuickSlot(i));
       const slotIdx = i;
       zone.on('pointerover', () => this.showItemTooltip(slotIdx));
@@ -1079,7 +1248,9 @@ export class GameScene extends Phaser.Scene {
 
   private drawQuickSlots() {
     for (let i = 0; i < 2; i++) {
-      const x = QSLOT_XS[i], slot = this.quickSlots[i], bg = this.qSlotBgs[i];
+      const x = QSLOT_XS[i],
+        slot = this.quickSlots[i],
+        bg = this.qSlotBgs[i];
       bg.clear();
       if (slot.potionLv > 0 && slot.count > 0) {
         const pd = POTION_DATA[slot.potionLv];
@@ -1118,8 +1289,12 @@ export class GameScene extends Phaser.Scene {
     if (pd.healAmount >= 0) heal = Math.ceil(heal * this.potionMultiplier);
     this.playerHp = Math.min(this.playerHp + heal, this.playerMaxHp);
     slot.count--;
-    if (slot.count <= 0) { slot.potionLv = 0; slot.count = 0; }
-    this.drawPlayerHpBar(); this.drawQuickSlots();
+    if (slot.count <= 0) {
+      slot.potionLv = 0;
+      slot.count = 0;
+    }
+    this.drawPlayerHpBar();
+    this.drawQuickSlots();
     DamageText.show(this, QSLOT_XS[index], QSLOT_Y - 35, `+${heal} HP`, '#44ff44', '18px');
     if (this.qSlotBgs[index]) {
       this.tweens.add({ targets: this.qSlotBgs[index], alpha: 0.4, duration: 80, yoyo: true });
@@ -1136,10 +1311,19 @@ export class GameScene extends Phaser.Scene {
 
   private addPotion(lv: number): boolean {
     for (const s of this.quickSlots) {
-      if (s.potionLv === lv && s.count < MAX_POTION_STACK) { s.count++; this.drawQuickSlots(); return true; }
+      if (s.potionLv === lv && s.count < MAX_POTION_STACK) {
+        s.count++;
+        this.drawQuickSlots();
+        return true;
+      }
     }
     for (const s of this.quickSlots) {
-      if (s.potionLv === 0 || s.count <= 0) { s.potionLv = lv; s.count = 1; this.drawQuickSlots(); return true; }
+      if (s.potionLv === 0 || s.count <= 0) {
+        s.potionLv = lv;
+        s.count = 1;
+        this.drawQuickSlots();
+        return true;
+      }
     }
     return false;
   }
@@ -1149,10 +1333,17 @@ export class GameScene extends Phaser.Scene {
      ================================================================ */
 
   private createSkillSlots() {
-    this.add.text(400, SLOT_Y - 34, 'SKILL', {
-      fontSize: '10px', color: '#777788', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(48);
+    this.add
+      .text(400, SLOT_Y - 34, 'SKILL', {
+        fontSize: '10px',
+        color: '#777788',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(48);
     const SKILL_KEYS = ['Q', 'W', 'E', 'R'];
     for (let i = 0; i < MAX_SLOTS; i++) {
       const gfx = this.add.graphics().setDepth(48);
@@ -1162,27 +1353,48 @@ export class GameScene extends Phaser.Scene {
       gfx.lineStyle(2, 0x333344, 0.6);
       gfx.strokeRoundedRect(sx - SLOT_W / 2, SLOT_Y - SLOT_H / 2, SLOT_W, SLOT_H, 10);
       this.emptySlotGfx.push(gfx);
-      this.add.text(sx, SLOT_Y, '+', {
-        fontSize: '22px', color: '#333344', fontFamily: 'Arial', fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(48);
-      this.add.text(sx - SLOT_W / 2 + 4, SLOT_Y - SLOT_H / 2 + 2, SKILL_KEYS[i], {
-        fontSize: '9px', color: '#aaaacc', fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 2,
-      }).setDepth(52);
+      this.add
+        .text(sx, SLOT_Y, '+', {
+          fontSize: '22px',
+          color: '#333344',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setDepth(48);
+      this.add
+        .text(sx - SLOT_W / 2 + 4, SLOT_Y - SLOT_H / 2 + 2, SKILL_KEYS[i], {
+          fontSize: '9px',
+          color: '#aaaacc',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setDepth(52);
     }
     this.skillButtons = new Array(MAX_SLOTS).fill(null);
     this.createPassiveSlot();
   }
 
   private createPassiveSlot() {
-    const px = 700, py = SLOT_Y;
-    const pw = 72, ph = 55;
+    const px = 700,
+      py = SLOT_Y;
+    const pw = 72,
+      ph = 55;
     const cls = this.selectedClass;
 
-    this.add.text(px, py - 34, 'PASSIVE', {
-      fontSize: '9px', color: '#777788', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(48);
+    this.add
+      .text(px, py - 34, 'PASSIVE', {
+        fontSize: '9px',
+        color: '#777788',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(48);
 
     const bg = this.add.graphics().setDepth(48);
     bg.fillStyle(cls.color, 0.6);
@@ -1190,24 +1402,47 @@ export class GameScene extends Phaser.Scene {
     bg.lineStyle(2, cls.borderColor, 0.8);
     bg.strokeRoundedRect(px - pw / 2, py - ph / 2, pw, ph, 10);
 
-    this.add.text(px, py - 12, cls.icon, {
-      fontSize: '22px',
-    }).setOrigin(0.5).setDepth(49);
+    this.add
+      .text(px, py - 12, cls.icon, {
+        fontSize: '22px',
+      })
+      .setOrigin(0.5)
+      .setDepth(49);
 
-    this.add.text(px, py + 14, cls.name, {
-      fontSize: '9px', color: '#cccccc', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(49);
+    this.add
+      .text(px, py + 14, cls.name, {
+        fontSize: '9px',
+        color: '#cccccc',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(49);
 
     const zone = this.add.zone(px, py, pw, ph).setInteractive().setDepth(50);
-    const tooltip = this.add.text(px, py - ph / 2 - 8, `✦ ${cls.passive}`, {
-      fontSize: '11px', color: '#ffdd88', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3, backgroundColor: '#111122',
-      padding: { x: 6, y: 4 },
-    }).setOrigin(0.5, 1).setDepth(200).setVisible(false);
+    const tooltip = this.add
+      .text(px, py - ph / 2 - 8, `✦ ${cls.passive}`, {
+        fontSize: '11px',
+        color: '#ffdd88',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+        backgroundColor: '#111122',
+        padding: { x: 6, y: 4 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(200)
+      .setVisible(false);
 
-    zone.on('pointerover', () => { tooltip.setVisible(true); });
-    zone.on('pointerout', () => { tooltip.setVisible(false); });
+    zone.on('pointerover', () => {
+      tooltip.setVisible(true);
+    });
+    zone.on('pointerout', () => {
+      tooltip.setVisible(false);
+    });
   }
 
   private createBuffBar() {
@@ -1217,14 +1452,21 @@ export class GameScene extends Phaser.Scene {
 
   private createTooltip() {
     this.tooltipBg = this.add.graphics().setDepth(900).setVisible(false);
-    this.tooltipText = this.add.text(0, 0, '', {
-      fontSize: '11px', color: '#eeeeee', fontFamily: 'Arial, sans-serif',
-      stroke: '#000000', strokeThickness: 2, lineSpacing: 4,
-      padding: { x: 8, y: 6 },
-      backgroundColor: '#0a0a1e',
-      fixedWidth: 220,
-      wordWrap: { width: 204 },
-    }).setDepth(901).setVisible(false);
+    this.tooltipText = this.add
+      .text(0, 0, '', {
+        fontSize: '11px',
+        color: '#eeeeee',
+        fontFamily: 'Arial, sans-serif',
+        stroke: '#000000',
+        strokeThickness: 2,
+        lineSpacing: 4,
+        padding: { x: 8, y: 6 },
+        backgroundColor: '#0a0a1e',
+        fixedWidth: 220,
+        wordWrap: { width: 204 },
+      })
+      .setDepth(901)
+      .setVisible(false);
   }
 
   private showTooltip(x: number, y: number, lines: string[]) {
@@ -1276,7 +1518,10 @@ export class GameScene extends Phaser.Scene {
     if (!slot || slot.potionLv <= 0 || slot.count <= 0) return;
     const pd = POTION_DATA[slot.potionLv];
     if (!pd) return;
-    const healDesc = pd.healAmount < 0 ? 'HP 완전 회복' : `HP +${Math.ceil(pd.healAmount * this.potionMultiplier)}`;
+    const healDesc =
+      pd.healAmount < 0
+        ? 'HP 완전 회복'
+        : `HP +${Math.ceil(pd.healAmount * this.potionMultiplier)}`;
     const lines = [
       `🧪 포션 ${pd.label}`,
       healDesc,
@@ -1296,23 +1541,44 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createOverdriveGauge() {
-    const gx = 280, gy = SLOT_Y - 52, gw = 240, gh = 10;
+    const gx = 280,
+      gy = SLOT_Y - 52,
+      gw = 240,
+      gh = 10;
     this.overdriveGaugeBg = this.add.graphics().setDepth(48);
     this.overdriveGaugeBg.fillStyle(0x111122, 0.7);
     this.overdriveGaugeBg.fillRoundedRect(gx, gy, gw, gh, 4);
     this.overdriveGaugeBg.lineStyle(1, 0x554400, 0.5);
     this.overdriveGaugeBg.strokeRoundedRect(gx, gy, gw, gh, 4);
     this.overdriveGaugeFill = this.add.graphics().setDepth(49);
-    this.overdriveGaugeText = this.add.text(gx + gw / 2, gy - 1, 'OD 0%', {
-      fontSize: '8px', color: '#ffaa00', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5, 1).setDepth(50);
-    this.odReadyText = this.add.text(gx + gw / 2, gy + gh + 2, '', {
-      fontSize: '10px', color: '#ffdd00', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5, 0).setDepth(50).setAlpha(0);
+    this.overdriveGaugeText = this.add
+      .text(gx + gw / 2, gy - 1, 'OD 0%', {
+        fontSize: '8px',
+        color: '#ffaa00',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(50);
+    this.odReadyText = this.add
+      .text(gx + gw / 2, gy + gh + 2, '', {
+        fontSize: '10px',
+        color: '#ffdd00',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(50)
+      .setAlpha(0);
 
-    const odZone = this.add.zone(gx + gw / 2, gy + gh / 2, gw, gh + 12).setInteractive().setDepth(55);
+    const odZone = this.add
+      .zone(gx + gw / 2, gy + gh / 2, gw, gh + 12)
+      .setInteractive()
+      .setDepth(55);
     odZone.on('pointerdown', () => this.tryActivateOverdrive());
 
     this.drawOverdriveGauge();
@@ -1326,7 +1592,10 @@ export class GameScene extends Phaser.Scene {
 
   private drawOverdriveGauge() {
     if (!this.overdriveGaugeFill || !this.overdriveGaugeText) return;
-    const gx = 280, gy = SLOT_Y - 52, gw = 240, gh = 10;
+    const gx = 280,
+      gy = SLOT_Y - 52,
+      gw = 240,
+      gh = 10;
     this.overdriveGaugeFill.clear();
     const ratio = Phaser.Math.Clamp(this.overdriveGauge / 100, 0, 1);
     if (ratio > 0) {
@@ -1345,19 +1614,33 @@ export class GameScene extends Phaser.Scene {
       if (this.overdriveGauge >= 100) {
         this.odReadyText.setText('OVERDRIVE! [Enter]').setAlpha(1);
         if (!this.odPulseTween || !this.odPulseTween.isPlaying()) {
-          this.odPulseTween = this.tweens.add({ targets: [this.odReadyText, this.overdriveGaugeFill], alpha: 0.4, duration: 300, yoyo: true, repeat: -1 });
+          this.odPulseTween = this.tweens.add({
+            targets: [this.odReadyText, this.overdriveGaugeFill],
+            alpha: 0.4,
+            duration: 300,
+            yoyo: true,
+            repeat: -1,
+          });
         }
       } else if (this.overdriveGauge >= 80) {
         this.odReadyText.setText('OVERDRIVE 준비!').setAlpha(1);
         if (!this.odPulseTween || !this.odPulseTween.isPlaying()) {
-          this.odPulseTween = this.tweens.add({ targets: this.overdriveGaugeFill, alpha: 0.5, duration: 500, yoyo: true, repeat: -1 });
+          this.odPulseTween = this.tweens.add({
+            targets: this.overdriveGaugeFill,
+            alpha: 0.5,
+            duration: 500,
+            yoyo: true,
+            repeat: -1,
+          });
         }
       } else if (this.overdriveGauge >= 50) {
-        this.odPulseTween?.stop(); this.odPulseTween = undefined;
+        this.odPulseTween?.stop();
+        this.odPulseTween = undefined;
         this.overdriveGaugeFill?.setAlpha(1);
         this.odReadyText.setAlpha(0);
       } else {
-        this.odPulseTween?.stop(); this.odPulseTween = undefined;
+        this.odPulseTween?.stop();
+        this.odPulseTween = undefined;
         this.overdriveGaugeFill?.setAlpha(1);
         this.odReadyText.setAlpha(0);
       }
@@ -1379,7 +1662,8 @@ export class GameScene extends Phaser.Scene {
     this.overdriveActive = true;
     this.overdriveFever = this.comboCount >= 30;
     this.overdriveGauge = 100;
-    this.odPulseTween?.stop(); this.odPulseTween = undefined;
+    this.odPulseTween?.stop();
+    this.odPulseTween = undefined;
     this.overdriveGaugeFill?.setAlpha(1);
     this.odReadyText?.setAlpha(0);
     this.drawOverdriveGauge();
@@ -1393,7 +1677,11 @@ export class GameScene extends Phaser.Scene {
     const ring = this.add.graphics().setDepth(200).setAlpha(1);
     const ringObj = { r: 10, a: 1 };
     this.tweens.add({
-      targets: ringObj, r: 300, a: 0, duration: 500, ease: 'Quad.easeOut',
+      targets: ringObj,
+      r: 300,
+      a: 0,
+      duration: 500,
+      ease: 'Quad.easeOut',
       onUpdate: () => {
         ring.clear();
         ring.lineStyle(4, this.overdriveFever ? 0xff44ff : 0xffcc00, ringObj.a);
@@ -1407,14 +1695,33 @@ export class GameScene extends Phaser.Scene {
     /* --- 2) Title text bounce --- */
     const titleLabel = this.overdriveFever ? '⚡ OVERDRIVE FEVER!! ⚡' : '⚡ OVERDRIVE!! ⚡';
     const titleColor = this.overdriveFever ? '#ff44ff' : '#ffdd00';
-    const titleText = this.add.text(400, 350, titleLabel, {
-      fontSize: '42px', color: titleColor, fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 6,
-    }).setOrigin(0.5).setDepth(210).setAlpha(0);
+    const titleText = this.add
+      .text(400, 350, titleLabel, {
+        fontSize: '42px',
+        color: titleColor,
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setDepth(210)
+      .setAlpha(0);
     this.tweens.add({
-      targets: titleText, y: 230, alpha: 1, duration: 300, ease: 'Back.easeOut',
+      targets: titleText,
+      y: 230,
+      alpha: 1,
+      duration: 300,
+      ease: 'Back.easeOut',
       onComplete: () => {
-        this.tweens.add({ targets: titleText, alpha: 0, y: 200, duration: 600, delay: 600, onComplete: () => titleText.destroy() });
+        this.tweens.add({
+          targets: titleText,
+          alpha: 0,
+          y: 200,
+          duration: 600,
+          delay: 600,
+          onComplete: () => titleText.destroy(),
+        });
       },
     });
 
@@ -1430,17 +1737,34 @@ export class GameScene extends Phaser.Scene {
       }
     } else if (cls === 'mage') {
       const magic = this.add.graphics().setDepth(195).setAlpha(0);
-      magic.lineStyle(2, 0x4488ff, 1); magic.strokeCircle(400, 300, 120);
-      magic.lineStyle(1, 0xffcc00, 0.8); magic.strokeCircle(400, 300, 100);
-      magic.lineStyle(1, 0x4488ff, 0.6); magic.strokeCircle(400, 300, 80);
-      this.tweens.add({ targets: magic, alpha: 0.8, duration: 200, yoyo: true, hold: 300, onComplete: () => magic.destroy() });
+      magic.lineStyle(2, 0x4488ff, 1);
+      magic.strokeCircle(400, 300, 120);
+      magic.lineStyle(1, 0xffcc00, 0.8);
+      magic.strokeCircle(400, 300, 100);
+      magic.lineStyle(1, 0x4488ff, 0.6);
+      magic.strokeCircle(400, 300, 80);
+      this.tweens.add({
+        targets: magic,
+        alpha: 0.8,
+        duration: 200,
+        yoyo: true,
+        hold: 300,
+        onComplete: () => magic.destroy(),
+      });
       this.emitParticles(400, 300, [0x4488ff, 0xffcc00, 0xffffff], 16);
     } else if (cls === 'rogue') {
       for (let i = 0; i < 3; i++) {
         const ghost = this.add.graphics().setDepth(195).setAlpha(0.5);
         ghost.fillStyle(0x9944cc, 0.4);
         ghost.fillCircle(400 + (i - 1) * 50, 300, 25);
-        this.tweens.add({ targets: ghost, alpha: 0, x: (i - 1) * 30, duration: 600, delay: i * 100, onComplete: () => ghost.destroy() });
+        this.tweens.add({
+          targets: ghost,
+          alpha: 0,
+          x: (i - 1) * 30,
+          duration: 600,
+          delay: i * 100,
+          onComplete: () => ghost.destroy(),
+        });
       }
       this.emitParticles(400, 300, [0x9944cc, 0xffcc00], 14);
     }
@@ -1460,26 +1784,47 @@ export class GameScene extends Phaser.Scene {
     this.overdriveEdgeGfx.strokeRect(2, 2, 796, 596);
     this.overdriveEdgeGfx.lineStyle(2, 0xffffff, 0.3);
     this.overdriveEdgeGfx.strokeRect(6, 6, 788, 588);
-    this.tweens.add({ targets: this.overdriveEdgeGfx, alpha: 0.4, duration: 350, yoyo: true, repeat: -1 });
+    this.tweens.add({
+      targets: this.overdriveEdgeGfx,
+      alpha: 0.4,
+      duration: 350,
+      yoyo: true,
+      repeat: -1,
+    });
 
     /* --- 6) Time bar at top --- */
-    const tbx = 200, tby = 8, tbw = 400, tbh = 6;
+    const tbx = 200,
+      tby = 8,
+      tbw = 400,
+      tbh = 6;
     this.odTimeBarBg = this.add.graphics().setDepth(200);
-    this.odTimeBarBg.fillStyle(0x000000, 0.5); this.odTimeBarBg.fillRoundedRect(tbx, tby, tbw, tbh, 3);
+    this.odTimeBarBg.fillStyle(0x000000, 0.5);
+    this.odTimeBarBg.fillRoundedRect(tbx, tby, tbw, tbh, 3);
     this.odTimeBar = this.add.graphics().setDepth(201);
 
     /* --- 7) Floating gold particles --- */
     this.odParticleTimer = this.time.addEvent({
-      delay: 120, loop: true,
+      delay: 120,
+      loop: true,
       callback: () => {
         if (!this.overdriveActive) return;
-        const px = Phaser.Math.Between(20, 780), py = Phaser.Math.Between(20, 580);
-        const col = this.overdriveFever ? Phaser.Math.RND.pick([0xff44ff, 0xffcc00, 0xffffff]) : Phaser.Math.RND.pick([0xffdd00, 0xffaa00, 0xffffff]);
+        const px = Phaser.Math.Between(20, 780),
+          py = Phaser.Math.Between(20, 580);
+        const col = this.overdriveFever
+          ? Phaser.Math.RND.pick([0xff44ff, 0xffcc00, 0xffffff])
+          : Phaser.Math.RND.pick([0xffdd00, 0xffaa00, 0xffffff]);
         const p = this.add.graphics().setDepth(6).setAlpha(0.7);
         const sz = Phaser.Math.FloatBetween(1.5, 3.5);
-        p.fillStyle(col, 1); p.fillCircle(0, 0, sz);
+        p.fillStyle(col, 1);
+        p.fillCircle(0, 0, sz);
         p.setPosition(px, py);
-        this.tweens.add({ targets: p, y: py - 40, alpha: 0, duration: Phaser.Math.Between(600, 1200), onComplete: () => p.destroy() });
+        this.tweens.add({
+          targets: p,
+          y: py - 40,
+          alpha: 0,
+          duration: Phaser.Math.Between(600, 1200),
+          onComplete: () => p.destroy(),
+        });
       },
     });
 
@@ -1487,14 +1832,19 @@ export class GameScene extends Phaser.Scene {
     this.odAuraGfx = this.add.graphics().setDepth(90);
     const auraObj = { angle: 0 };
     this.odAuraTween = this.tweens.add({
-      targets: auraObj, angle: 360, duration: 2000, repeat: -1,
+      targets: auraObj,
+      angle: 360,
+      duration: 2000,
+      repeat: -1,
       onUpdate: () => {
         if (!this.odAuraGfx || !this.targetMonster) return;
         this.odAuraGfx.clear();
-        const cx = 400, cy = 460;
+        const cx = 400,
+          cy = 460;
         for (let i = 0; i < 6; i++) {
           const a = ((auraObj.angle + i * 60) * Math.PI) / 180;
-          const rx = cx + Math.cos(a) * 22, ry = cy + Math.sin(a) * 12;
+          const rx = cx + Math.cos(a) * 22,
+            ry = cy + Math.sin(a) * 12;
           this.odAuraGfx.fillStyle(this.overdriveFever ? 0xff44ff : 0xffcc00, 0.5);
           this.odAuraGfx.fillCircle(rx, ry, 3);
         }
@@ -1504,7 +1854,8 @@ export class GameScene extends Phaser.Scene {
     /* --- 9) Skill slot glow cycle --- */
     let glowIdx = 0;
     this.odSlotGlowTimer = this.time.addEvent({
-      delay: 200, loop: true,
+      delay: 200,
+      loop: true,
       callback: () => {
         if (!this.overdriveActive) return;
         for (let i = 0; i < this.skillButtons.length; i++) {
@@ -1528,7 +1879,8 @@ export class GameScene extends Phaser.Scene {
     /* --- 11) Duration timer with countdown --- */
     let remaining = 5;
     this.overdriveTimer = this.time.addEvent({
-      delay: 1000, repeat: 4,
+      delay: 1000,
+      repeat: 4,
       callback: () => {
         remaining--;
         this.overdriveGauge = Math.max(0, (remaining / 5) * 100);
@@ -1536,13 +1888,27 @@ export class GameScene extends Phaser.Scene {
         this.drawOdTimeBar(remaining / 5, remaining <= 2);
         if (remaining <= 3 && remaining > 0) {
           if (!this.overdriveCountdown) {
-            this.overdriveCountdown = this.add.text(400, 160, '', {
-              fontSize: '36px', color: '#ffdd00', fontFamily: 'Arial', fontStyle: 'bold',
-              stroke: '#000000', strokeThickness: 6,
-            }).setOrigin(0.5).setDepth(210);
+            this.overdriveCountdown = this.add
+              .text(400, 160, '', {
+                fontSize: '36px',
+                color: '#ffdd00',
+                fontFamily: 'Arial',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 6,
+              })
+              .setOrigin(0.5)
+              .setDepth(210);
           }
           this.overdriveCountdown.setText(`${remaining}`).setAlpha(1).setScale(1);
-          this.tweens.add({ targets: this.overdriveCountdown, alpha: 0, scaleX: 2.5, scaleY: 2.5, duration: 800, onComplete: () => this.overdriveCountdown?.setScale(1) });
+          this.tweens.add({
+            targets: this.overdriveCountdown,
+            alpha: 0,
+            scaleX: 2.5,
+            scaleY: 2.5,
+            duration: 800,
+            onComplete: () => this.overdriveCountdown?.setScale(1),
+          });
         }
         if (remaining <= 0) {
           this.endOverdrive();
@@ -1553,14 +1919,19 @@ export class GameScene extends Phaser.Scene {
 
     /* --- Hitstop (must be last so all setup completes first) --- */
     this.time.paused = true;
-    setTimeout(() => { if (!this.pauseOpen) this.time.paused = false; }, 150);
+    setTimeout(() => {
+      if (!this.pauseOpen) this.time.paused = false;
+    }, 150);
   }
 
   private drawOdTimeBar(ratio: number, urgent: boolean) {
     if (!this.odTimeBar) return;
-    const tbx = 200, tby = 8, tbw = 400, tbh = 6;
+    const tbx = 200,
+      tby = 8,
+      tbw = 400,
+      tbh = 6;
     this.odTimeBar.clear();
-    const col = urgent ? 0xff4444 : (this.overdriveFever ? 0xff44ff : 0xffcc00);
+    const col = urgent ? 0xff4444 : this.overdriveFever ? 0xff44ff : 0xffcc00;
     this.odTimeBar.fillStyle(col, 0.9);
     this.odTimeBar.fillRoundedRect(tbx, tby, tbw * ratio, tbh, 3);
   }
@@ -1569,30 +1940,68 @@ export class GameScene extends Phaser.Scene {
     this.overdriveActive = false;
     this.overdriveFever = false;
     this.overdriveGauge = 0;
-    this.overdriveTimer?.remove(); this.overdriveTimer = undefined;
-    this.odParticleTimer?.remove(); this.odParticleTimer = undefined;
-    this.odSlotGlowTimer?.remove(); this.odSlotGlowTimer = undefined;
-    this.odAuraTween?.stop(); this.odAuraTween = undefined;
-    this.odAuraGfx?.destroy(); this.odAuraGfx = undefined;
-    this.overdriveCountdown?.destroy(); this.overdriveCountdown = undefined;
-    this.odTimeBar?.destroy(); this.odTimeBar = undefined;
-    this.odTimeBarBg?.destroy(); this.odTimeBarBg = undefined;
+    this.overdriveTimer?.remove();
+    this.overdriveTimer = undefined;
+    this.odParticleTimer?.remove();
+    this.odParticleTimer = undefined;
+    this.odSlotGlowTimer?.remove();
+    this.odSlotGlowTimer = undefined;
+    this.odAuraTween?.stop();
+    this.odAuraTween = undefined;
+    this.odAuraGfx?.destroy();
+    this.odAuraGfx = undefined;
+    this.overdriveCountdown?.destroy();
+    this.overdriveCountdown = undefined;
+    this.odTimeBar?.destroy();
+    this.odTimeBar = undefined;
+    this.odTimeBarBg?.destroy();
+    this.odTimeBarBg = undefined;
 
     for (const btn of this.skillButtons) {
       if (btn) btn.setOverdriveGlow(false);
     }
 
-    const endText = this.add.text(400, 240, 'OVERDRIVE END', {
-      fontSize: '28px', color: '#888888', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(210).setAlpha(0.8);
-    this.tweens.add({ targets: endText, alpha: 0, y: 220, duration: 1000, onComplete: () => endText.destroy() });
+    const endText = this.add
+      .text(400, 240, 'OVERDRIVE END', {
+        fontSize: '28px',
+        color: '#888888',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(210)
+      .setAlpha(0.8);
+    this.tweens.add({
+      targets: endText,
+      alpha: 0,
+      y: 220,
+      duration: 1000,
+      onComplete: () => endText.destroy(),
+    });
 
     if (this.overdriveEdgeGfx) {
-      this.tweens.add({ targets: this.overdriveEdgeGfx, alpha: 0, duration: 500, onComplete: () => { this.overdriveEdgeGfx?.destroy(); this.overdriveEdgeGfx = undefined; } });
+      this.tweens.add({
+        targets: this.overdriveEdgeGfx,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => {
+          this.overdriveEdgeGfx?.destroy();
+          this.overdriveEdgeGfx = undefined;
+        },
+      });
     }
     if (this.odDarkOverlay) {
-      this.tweens.add({ targets: this.odDarkOverlay, alpha: 0, duration: 500, onComplete: () => { this.odDarkOverlay?.destroy(); this.odDarkOverlay = undefined; } });
+      this.tweens.add({
+        targets: this.odDarkOverlay,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => {
+          this.odDarkOverlay?.destroy();
+          this.odDarkOverlay = undefined;
+        },
+      });
     }
 
     this.drawOverdriveGauge();
@@ -1602,7 +2011,9 @@ export class GameScene extends Phaser.Scene {
   private addComboHit() {
     this.comboCount++;
     this.comboTimer?.remove();
-    this.comboTimer = this.time.delayedCall(3000, () => { this.comboCount = 0; });
+    this.comboTimer = this.time.delayedCall(3000, () => {
+      this.comboCount = 0;
+    });
     if (this.comboCount === 10) this.addOverdrive(20);
     else if (this.comboCount === 20) this.addOverdrive(40);
   }
@@ -1610,8 +2021,10 @@ export class GameScene extends Phaser.Scene {
   /* ---- Emergency Defense ---- */
 
   private createEmergencyDefBtn() {
-    const bx = HP_BAR.x + HP_BAR.w + 36, by = HP_BAR.y + 10;
-    const bw = 42, bh = 38;
+    const bx = HP_BAR.x + HP_BAR.w + 36,
+      by = HP_BAR.y + 10;
+    const bw = 42,
+      bh = 38;
     const container = this.add.container(bx, by).setDepth(52);
 
     const bg = this.add.graphics();
@@ -1624,10 +2037,16 @@ export class GameScene extends Phaser.Scene {
     const icon = this.add.text(0, -5, '🛡', { fontSize: '18px' }).setOrigin(0.5);
     container.add(icon);
 
-    this.emergencyDefCdText = this.add.text(0, 14, '', {
-      fontSize: '8px', color: '#aaccff', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5);
+    this.emergencyDefCdText = this.add
+      .text(0, 14, '', {
+        fontSize: '8px',
+        color: '#aaccff',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5);
     container.add(this.emergencyDefCdText);
 
     const zone = this.add.zone(0, 0, bw, bh).setInteractive({ useHandCursor: true });
@@ -1635,17 +2054,18 @@ export class GameScene extends Phaser.Scene {
     zone.on('pointerdown', () => this.useEmergencyDef());
     zone.on('pointerover', () => {
       const isMage = this.selectedClass.id === 'mage';
-      this.showTooltip(bx, by - bh / 2, isMage ? [
-        '🔮 마법 배리어',
-        '다음 피해 1회 완전 흡수',
-        '흡수 데미지 30% 반사',
-        '쿨타임: 15초',
-      ] : [
-        '🛡 긴급 방어',
-        '2초간 피해 -70%',
-        '보스 강공격 중 사용 시 완전 무효화',
-        '쿨타임: 20초',
-      ]);
+      this.showTooltip(
+        bx,
+        by - bh / 2,
+        isMage
+          ? ['🔮 마법 배리어', '다음 피해 1회 완전 흡수', '흡수 데미지 30% 반사', '쿨타임: 15초']
+          : [
+              '🛡 긴급 방어',
+              '2초간 피해 -70%',
+              '보스 강공격 중 사용 시 완전 무효화',
+              '쿨타임: 20초',
+            ],
+      );
     });
     zone.on('pointerout', () => this.hideTooltip());
 
@@ -1702,15 +2122,28 @@ export class GameScene extends Phaser.Scene {
   /* ---- Parry System (Spacebar / Right-click) ---- */
 
   private createParryUI() {
-    this.parryHintText = this.add.text(400, SLOT_Y + SLOT_H / 2 + 34, 'SPACE / 우클릭 = 패링', {
-      fontSize: '10px', color: '#887744', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(48);
+    this.parryHintText = this.add
+      .text(400, SLOT_Y + SLOT_H / 2 + 34, 'SPACE / 우클릭 = 패링', {
+        fontSize: '10px',
+        color: '#887744',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(48);
 
-    this.parryCdOverlay = this.add.text(400, SLOT_Y + SLOT_H / 2 + 46, '', {
-      fontSize: '9px', color: '#aa8844', fontFamily: 'Arial',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(48);
+    this.parryCdOverlay = this.add
+      .text(400, SLOT_Y + SLOT_H / 2 + 46, '', {
+        fontSize: '9px',
+        color: '#aa8844',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(48);
 
     this.parryGaugeGfx = this.add.graphics().setDepth(250);
     this.parryAuraGfx = this.add.graphics().setDepth(99);
@@ -1735,7 +2168,9 @@ export class GameScene extends Phaser.Scene {
     const mastery = this.parryMasteryLevel >= 1 ? 20 : 0;
     if (this.currentBossType === 'final') return 100 + mastery;
     if (this.currentBossType === 'mini') return 150 + mastery;
-    const hasSpecial = this.monsters.some(m => !m.isDead && m.specialType && m.specialType !== 'none');
+    const hasSpecial = this.monsters.some(
+      m => !m.isDead && m.specialType && m.specialType !== 'none',
+    );
     if (hasSpecial) return 150 + mastery;
     return 200 + mastery;
   }
@@ -1784,7 +2219,10 @@ export class GameScene extends Phaser.Scene {
     this.dismissNarration();
     this.narrationActive = true;
 
-    const bw = 600, bh = 100, bx = (800 - bw) / 2, by = (600 - bh) / 2;
+    const bw = 600,
+      bh = 100,
+      bx = (800 - bw) / 2,
+      by = (600 - bh) / 2;
     this.narrationBg = this.add.graphics().setDepth(800);
     this.narrationBg.fillStyle(0x000000, 0.82);
     this.narrationBg.fillRoundedRect(bx, by, bw, bh, 12);
@@ -1792,30 +2230,49 @@ export class GameScene extends Phaser.Scene {
     this.narrationBg.strokeRoundedRect(bx, by, bw, bh, 12);
 
     if (entry.speaker) {
-      this.narrationSpeaker = this.add.text(bx + 16, by + 8, entry.speaker, {
-        fontSize: '12px', color: '#ffaa44', fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 3,
-      }).setDepth(801);
+      this.narrationSpeaker = this.add
+        .text(bx + 16, by + 8, entry.speaker, {
+          fontSize: '12px',
+          color: '#ffaa44',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setDepth(801);
     }
 
     const textY = entry.speaker ? by + 28 : by + 16;
-    this.narrationText = this.add.text(bx + 20, textY, '', {
-      fontSize: '14px', color: '#dddddd', fontFamily: 'Arial',
-      stroke: '#000000', strokeThickness: 2, lineSpacing: 6,
-      wordWrap: { width: bw - 40 },
-    }).setDepth(801);
+    this.narrationText = this.add
+      .text(bx + 20, textY, '', {
+        fontSize: '14px',
+        color: '#dddddd',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 2,
+        lineSpacing: 6,
+        wordWrap: { width: bw - 40 },
+      })
+      .setDepth(801);
 
-    const skipText = this.add.text(bx + bw - 16, by + bh - 16, '클릭/스페이스 = 스킵', {
-      fontSize: '9px', color: '#666677', fontFamily: 'Arial',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(1, 1).setDepth(801);
+    const skipText = this.add
+      .text(bx + bw - 16, by + bh - 16, '클릭/스페이스 = 스킵', {
+        fontSize: '9px',
+        color: '#666677',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(1, 1)
+      .setDepth(801);
 
     const fullText = entry.lines.join('\n');
     let charIdx = 0;
     const typeSpeed = 35;
 
     this.narrationTypingTimer = this.time.addEvent({
-      delay: typeSpeed, repeat: fullText.length - 1,
+      delay: typeSpeed,
+      repeat: fullText.length - 1,
       callback: () => {
         charIdx++;
         this.narrationText?.setText(fullText.substring(0, charIdx));
@@ -1841,8 +2298,7 @@ export class GameScene extends Phaser.Scene {
       onDone?.();
     };
 
-    const skipZone = this.add.zone(400, 300, 800, 600)
-      .setInteractive().setDepth(799);
+    const skipZone = this.add.zone(400, 300, 800, 600).setInteractive().setDepth(799);
     const onSpace = () => dismiss();
     skipZone.on('pointerdown', () => dismiss());
     this.input.keyboard?.on('keydown-SPACE', onSpace);
@@ -1861,15 +2317,19 @@ export class GameScene extends Phaser.Scene {
     this.narrationActive = false;
     this.narrationTimer?.remove();
     this.narrationTypingTimer?.remove();
-    this.narrationBg?.destroy(); this.narrationBg = undefined;
-    this.narrationText?.destroy(); this.narrationText = undefined;
-    this.narrationSpeaker?.destroy(); this.narrationSpeaker = undefined;
+    this.narrationBg?.destroy();
+    this.narrationBg = undefined;
+    this.narrationText?.destroy();
+    this.narrationText = undefined;
+    this.narrationSpeaker?.destroy();
+    this.narrationSpeaker = undefined;
   }
 
   private cancelParrySequence() {
     this.parrySeqId++;
     this.attackSeqActive = false;
-    this.parryWindowTimer?.remove(); this.parryWindowTimer = undefined;
+    this.parryWindowTimer?.remove();
+    this.parryWindowTimer = undefined;
     this.parryGaugeGfx?.clear();
     this.parryAuraGfx?.clear();
     this.parryWindowOpen = false;
@@ -1904,7 +2364,8 @@ export class GameScene extends Phaser.Scene {
 
   private resolveParryHit(isPerfect: boolean) {
     this.parryWindowOpen = false;
-    this.parryWindowTimer?.remove(); this.parryWindowTimer = undefined;
+    this.parryWindowTimer?.remove();
+    this.parryWindowTimer = undefined;
     this.parryGaugeGfx?.clear();
 
     if (this.parryMultiHitQueue.length > 0) {
@@ -1948,19 +2409,30 @@ export class GameScene extends Phaser.Scene {
     let dmgReduce: number;
 
     if (isCounterFake) {
-      atkMult = 5; odGain = 100; dmgReduce = 1;
-      label = '⚡ COUNTER! ⚡'; color = '#ffd700';
+      atkMult = 5;
+      odGain = 100;
+      dmgReduce = 1;
+      label = '⚡ COUNTER! ⚡';
+      color = '#ffd700';
       this.overdriveGauge = 100;
       this.drawOverdriveGauge();
       this.activateOverdrive();
     } else if (isPerfect) {
-      atkMult = 3; odGain = 30; dmgReduce = 1;
-      label = '✨ PERFECT! ✨'; color = '#ffd700';
+      atkMult = 3;
+      odGain = 30;
+      dmgReduce = 1;
+      label = '✨ PERFECT! ✨';
+      color = '#ffd700';
       this.scene.pause();
-      setTimeout(() => { if (this.scene.isPaused() && !this.pauseOpen) this.scene.resume(); }, 100);
+      setTimeout(() => {
+        if (this.scene.isPaused() && !this.pauseOpen) this.scene.resume();
+      }, 100);
     } else {
-      atkMult = 1.5; odGain = 15; dmgReduce = 0.7;
-      label = '⚔ PARRY!'; color = '#ffcc44';
+      atkMult = 1.5;
+      odGain = 15;
+      dmgReduce = 0.7;
+      label = '⚔ PARRY!';
+      color = '#ffcc44';
     }
 
     DamageText.show(this, 400, 200, label, color, isPerfect || isCounterFake ? '30px' : '24px');
@@ -1969,13 +2441,21 @@ export class GameScene extends Phaser.Scene {
     SoundManager.sfxCritical();
 
     this.monsterStunned = true;
-    this.time.delayedCall(1000, () => { this.monsterStunned = false; });
+    this.time.delayedCall(1000, () => {
+      this.monsterStunned = false;
+    });
 
     if (this.targetMonster && !this.targetMonster.isDead) {
       const counterDmg = Math.floor(this.effectiveAtk * atkMult);
       const dead = this.targetMonster.takeDamage(counterDmg);
-      DamageText.show(this, this.targetMonster.x, this.targetMonster.y - 50,
-        `반격! ${counterDmg}`, color, '22px');
+      DamageText.show(
+        this,
+        this.targetMonster.x,
+        this.targetMonster.y - 50,
+        `반격! ${counterDmg}`,
+        color,
+        '22px',
+      );
       if (dead) this.handleMonsterKill(this.targetMonster);
     }
 
@@ -1993,7 +2473,14 @@ export class GameScene extends Phaser.Scene {
 
   private startMonsterAttackSequence() {
     const alive = this.monsters.filter(m => !m.isDead);
-    if (this.gameOver || this.cardSelecting || this.doorSelecting || this.pauseOpen || alive.length === 0) return;
+    if (
+      this.gameOver ||
+      this.cardSelecting ||
+      this.doorSelecting ||
+      this.pauseOpen ||
+      alive.length === 0
+    )
+      return;
     if (this.monsterStunned || this.monsterFrozen) return;
     if (this.attackSeqActive) return;
 
@@ -2002,7 +2489,8 @@ export class GameScene extends Phaser.Scene {
     const seqId = this.parrySeqId;
 
     const attacker = Phaser.Math.RND.pick(alive);
-    const ax = attacker.x, ay = attacker.y;
+    const ax = attacker.x,
+      ay = attacker.y;
     const isFake = this.shouldFakeAttack();
     const isBossMulti = this.currentBossType !== 'none' && !isFake;
     const hitCount = isBossMulti ? this.getBossMultiHitCount() : 1;
@@ -2017,8 +2505,14 @@ export class GameScene extends Phaser.Scene {
 
     const GAUGE_R = 18;
     const stale = () => seqId !== this.parrySeqId;
-    const abortCheck = () => stale() || this.gameOver || this.monsters.filter(m => !m.isDead).length === 0;
-    const cleanup = () => { this.parryAuraGfx?.clear(); this.parryGaugeGfx?.clear(); this.parryWindowOpen = false; this.parryIsFakePhase = false; };
+    const abortCheck = () =>
+      stale() || this.gameOver || this.monsters.filter(m => !m.isDead).length === 0;
+    const cleanup = () => {
+      this.parryAuraGfx?.clear();
+      this.parryGaugeGfx?.clear();
+      this.parryWindowOpen = false;
+      this.parryIsFakePhase = false;
+    };
 
     const runGaugeCycle = (onDone: () => void, gaugeColor: number, fake: boolean) => {
       const pw = this.getParryWindow();
@@ -2028,9 +2522,16 @@ export class GameScene extends Phaser.Scene {
 
       const gaugeFill = { val: 0 };
       const gaugeTween = this.tweens.add({
-        targets: gaugeFill, val: 1, duration: GAUGE_MS, ease: 'Linear',
+        targets: gaugeFill,
+        val: 1,
+        duration: GAUGE_MS,
+        ease: 'Linear',
         onUpdate: () => {
-          if (abortCheck()) { gaugeTween.stop(); cleanup(); return; }
+          if (abortCheck()) {
+            gaugeTween.stop();
+            cleanup();
+            return;
+          }
           this.parryGaugeGfx?.clear();
           this.parryGaugeGfx?.lineStyle(4, 0x333333, 0.6);
           this.parryGaugeGfx?.strokeCircle(ax, ay - 55, GAUGE_R);
@@ -2041,7 +2542,10 @@ export class GameScene extends Phaser.Scene {
           this.parryGaugeGfx?.strokePath();
         },
         onComplete: () => {
-          if (abortCheck()) { cleanup(); return; }
+          if (abortCheck()) {
+            cleanup();
+            return;
+          }
 
           if (fake) {
             this.parryGaugeGfx?.clear();
@@ -2050,7 +2554,10 @@ export class GameScene extends Phaser.Scene {
             this.parryGaugeGfx?.fillStyle(0x44ff44, 0.3);
             this.parryGaugeGfx?.fillCircle(ax, ay - 55, GAUGE_R - 2);
             this.time.delayedCall(120, () => {
-              if (abortCheck()) { cleanup(); return; }
+              if (abortCheck()) {
+                cleanup();
+                return;
+              }
               this.parryGaugeGfx?.clear();
               this.parryIsFakePhase = false;
               this.parryFakeCompleted = true;
@@ -2058,7 +2565,10 @@ export class GameScene extends Phaser.Scene {
                 DamageText.show(this, ax, ay - 80, '👁 페이크!', '#ff8800', '14px');
               }
               this.time.delayedCall(500, () => {
-                if (abortCheck()) { cleanup(); return; }
+                if (abortCheck()) {
+                  cleanup();
+                  return;
+                }
                 onDone();
               });
             });
@@ -2100,9 +2610,15 @@ export class GameScene extends Phaser.Scene {
     this.parryAuraGfx?.clear();
     const auraPulse = { val: 0 };
     const auraTween = this.tweens.add({
-      targets: auraPulse, val: 1, duration: WARN_MS,
+      targets: auraPulse,
+      val: 1,
+      duration: WARN_MS,
       onUpdate: () => {
-        if (abortCheck()) { auraTween.stop(); cleanup(); return; }
+        if (abortCheck()) {
+          auraTween.stop();
+          cleanup();
+          return;
+        }
         this.parryAuraGfx?.clear();
         const alpha = 0.15 + auraPulse.val * 0.35;
         const radius = 40 + auraPulse.val * 15;
@@ -2112,7 +2628,11 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.time.delayedCall(WARN_MS - GAUGE_MS, () => {
-      if (abortCheck()) { auraTween.stop(); cleanup(); return; }
+      if (abortCheck()) {
+        auraTween.stop();
+        cleanup();
+        return;
+      }
 
       const showParryFail = () => {
         if (this.parryAttempted && !this.parryEarlyFailed) {
@@ -2124,30 +2644,46 @@ export class GameScene extends Phaser.Scene {
 
       if (isFake) {
         const fakeColor = 0xff8800;
-        runGaugeCycle(() => {
-          if (abortCheck()) { auraTween.stop(); cleanup(); return; }
-          const realColor = this.getGaugeColor();
-          runGaugeCycle(() => {
-            auraTween.stop();
-            this.parryAuraGfx?.clear();
-            if (abortCheck()) return;
-            showParryFail();
-            this.onMonsterAttack();
-          }, realColor, false);
-        }, fakeColor, true);
+        runGaugeCycle(
+          () => {
+            if (abortCheck()) {
+              auraTween.stop();
+              cleanup();
+              return;
+            }
+            const realColor = this.getGaugeColor();
+            runGaugeCycle(
+              () => {
+                auraTween.stop();
+                this.parryAuraGfx?.clear();
+                if (abortCheck()) return;
+                showParryFail();
+                this.onMonsterAttack();
+              },
+              realColor,
+              false,
+            );
+          },
+          fakeColor,
+          true,
+        );
       } else if (hitCount > 1) {
         for (let i = 0; i < hitCount; i++) this.parryMultiHitQueue.push(i);
         this.runMultiHitGauge();
         return;
       } else {
         const color = this.getGaugeColor();
-        runGaugeCycle(() => {
-          auraTween.stop();
-          this.parryAuraGfx?.clear();
-          if (abortCheck()) return;
-          showParryFail();
-          this.onMonsterAttack();
-        }, color, false);
+        runGaugeCycle(
+          () => {
+            auraTween.stop();
+            this.parryAuraGfx?.clear();
+            if (abortCheck()) return;
+            showParryFail();
+            this.onMonsterAttack();
+          },
+          color,
+          false,
+        );
       }
     });
   }
@@ -2157,7 +2693,8 @@ export class GameScene extends Phaser.Scene {
     if (this.gameOver || alive.length === 0) return;
     const seqId = this.parrySeqId;
     const attacker = alive[0];
-    const ax = attacker.x, ay = attacker.y;
+    const ax = attacker.x,
+      ay = attacker.y;
     const remaining = this.parryMultiHitQueue.length;
     const total = remaining + this.parryMultiHitSuccesses;
     const GAUGE_R = 18;
@@ -2172,13 +2709,21 @@ export class GameScene extends Phaser.Scene {
     this.parryIsFakePhase = false;
 
     const stale = () => seqId !== this.parrySeqId;
-    const abortCheck = () => stale() || this.gameOver || this.monsters.filter(m => !m.isDead).length === 0;
+    const abortCheck = () =>
+      stale() || this.gameOver || this.monsters.filter(m => !m.isDead).length === 0;
 
     const gaugeFill = { val: 0 };
     const gaugeTween = this.tweens.add({
-      targets: gaugeFill, val: 1, duration: GAUGE_MS, ease: 'Linear',
+      targets: gaugeFill,
+      val: 1,
+      duration: GAUGE_MS,
+      ease: 'Linear',
       onUpdate: () => {
-        if (abortCheck()) { gaugeTween.stop(); this.parryGaugeGfx?.clear(); return; }
+        if (abortCheck()) {
+          gaugeTween.stop();
+          this.parryGaugeGfx?.clear();
+          return;
+        }
         this.parryGaugeGfx?.clear();
         this.parryGaugeGfx?.lineStyle(4, 0x333333, 0.6);
         this.parryGaugeGfx?.strokeCircle(ax, ay - 55, GAUGE_R);
@@ -2189,7 +2734,10 @@ export class GameScene extends Phaser.Scene {
         this.parryGaugeGfx?.strokePath();
       },
       onComplete: () => {
-        if (abortCheck()) { this.parryGaugeGfx?.clear(); return; }
+        if (abortCheck()) {
+          this.parryGaugeGfx?.clear();
+          return;
+        }
         this.parryWindowOpen = true;
         this.parryWindowOpenTime = Date.now();
         this.parryGaugeGfx?.clear();
@@ -2231,23 +2779,38 @@ export class GameScene extends Phaser.Scene {
       DamageText.show(this, 400, 190, '⚡ PERFECT PARRY! ⚡', '#ffd700', '28px');
       this.emitParticles(400, 280, [0xffd700, 0xffffff], 16);
       this.scene.pause();
-      setTimeout(() => { if (this.scene.isPaused() && !this.pauseOpen) this.scene.resume(); }, 100);
+      setTimeout(() => {
+        if (this.scene.isPaused() && !this.pauseOpen) this.scene.resume();
+      }, 100);
       if (this.targetMonster && !this.targetMonster.isDead) {
         const dmg = Math.floor(this.effectiveAtk * 3);
         const dead = this.targetMonster.takeDamage(dmg);
-        DamageText.show(this, this.targetMonster.x, this.targetMonster.y - 50, `반격! ${dmg}`, '#ffd700', '22px');
+        DamageText.show(
+          this,
+          this.targetMonster.x,
+          this.targetMonster.y - 50,
+          `반격! ${dmg}`,
+          '#ffd700',
+          '22px',
+        );
         if (dead) this.handleMonsterKill(this.targetMonster);
       }
       this.addOverdrive(30);
       this.parrySuccessCount += total;
       this.checkParryMastery();
-      this.parryReady = false; this.parryCd = 8; this.updateParryCdDisplay();
+      this.parryReady = false;
+      this.parryCd = 8;
+      this.updateParryCdDisplay();
       this.monsterStunned = true;
-      this.time.delayedCall(1500, () => { this.monsterStunned = false; });
+      this.time.delayedCall(1500, () => {
+        this.monsterStunned = false;
+      });
     } else if (successes > 0) {
       this.parrySuccessCount += successes;
       this.checkParryMastery();
-      this.parryReady = false; this.parryCd = 8; this.updateParryCdDisplay();
+      this.parryReady = false;
+      this.parryCd = 8;
+      this.updateParryCdDisplay();
       this.onMonsterAttack();
     } else {
       this.onMonsterAttack();
@@ -2262,7 +2825,8 @@ export class GameScene extends Phaser.Scene {
     const isPerfect = elapsed <= this.getPerfectWindow();
     this.parrySeqId++;
     this.parryWindowOpen = false;
-    this.parryWindowTimer?.remove(); this.parryWindowTimer = undefined;
+    this.parryWindowTimer?.remove();
+    this.parryWindowTimer = undefined;
     this.parryReady = false;
     this.parryCd = 8;
     this.updateParryCdDisplay();
@@ -2281,17 +2845,28 @@ export class GameScene extends Phaser.Scene {
 
     if (isPerfect) {
       this.scene.pause();
-      setTimeout(() => { if (this.scene.isPaused() && !this.pauseOpen) this.scene.resume(); }, 100);
+      setTimeout(() => {
+        if (this.scene.isPaused() && !this.pauseOpen) this.scene.resume();
+      }, 100);
     }
 
     this.monsterStunned = true;
-    this.time.delayedCall(1000, () => { this.monsterStunned = false; });
+    this.time.delayedCall(1000, () => {
+      this.monsterStunned = false;
+    });
 
     if (this.targetMonster && !this.targetMonster.isDead) {
       const reflectDmg = Math.floor(Math.max(incomingDmg * 0.5, this.effectiveAtk * atkMult));
       if (reflectDmg > 0) {
         const dead = this.targetMonster.takeDamage(reflectDmg);
-        DamageText.show(this, this.targetMonster.x, this.targetMonster.y - 50, `반사! ${reflectDmg}`, '#ffd700', '20px');
+        DamageText.show(
+          this,
+          this.targetMonster.x,
+          this.targetMonster.y - 50,
+          `반사! ${reflectDmg}`,
+          '#ffd700',
+          '20px',
+        );
         if (dead) this.handleMonsterKill(this.targetMonster);
       }
     }
@@ -2312,7 +2887,14 @@ export class GameScene extends Phaser.Scene {
     DamageText.show(this, 400, 200, '🛡 BLOCK! 반격!', '#44aaff', '26px');
     if (counterDmg > 0 && this.targetMonster && !this.targetMonster.isDead) {
       const dead = this.targetMonster.takeDamage(counterDmg);
-      DamageText.show(this, this.targetMonster.x, this.targetMonster.y - 50, `반격 ${counterDmg}`, '#44aaff', '18px');
+      DamageText.show(
+        this,
+        this.targetMonster.x,
+        this.targetMonster.y - 50,
+        `반격 ${counterDmg}`,
+        '#44aaff',
+        '18px',
+      );
       if (dead) this.handleMonsterKill(this.targetMonster);
     }
     return true;
@@ -2326,7 +2908,14 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.flash(150, 100, 50, 255);
     if (reflectDmg > 0 && this.targetMonster && !this.targetMonster.isDead) {
       const dead = this.targetMonster.takeDamage(reflectDmg);
-      DamageText.show(this, this.targetMonster.x, this.targetMonster.y - 50, `반사 ${reflectDmg}`, '#aa66ff', '18px');
+      DamageText.show(
+        this,
+        this.targetMonster.x,
+        this.targetMonster.y - 50,
+        `반사 ${reflectDmg}`,
+        '#aa66ff',
+        '18px',
+      );
       if (dead) this.handleMonsterKill(this.targetMonster);
     }
     return { absorbed: true, dmg: 0 };
@@ -2352,13 +2941,38 @@ export class GameScene extends Phaser.Scene {
     const by = SLOT_Y + SLOT_H / 2 + 14;
 
     const stats: { icon: string; label: string; value: string; color: string }[] = [
-      { icon: '❤️', label: 'HP', value: `${Math.ceil(this.playerHp)}/${this.playerMaxHp}`, color: '#ff6666' },
-      { icon: '💎', label: 'MP', value: `${Math.ceil(this.playerMp)}/${this.playerMaxMp}`, color: '#4488ff' },
+      {
+        icon: '❤️',
+        label: 'HP',
+        value: `${Math.ceil(this.playerHp)}/${this.playerMaxHp}`,
+        color: '#ff6666',
+      },
+      {
+        icon: '💎',
+        label: 'MP',
+        value: `${Math.ceil(this.playerMp)}/${this.playerMaxMp}`,
+        color: '#4488ff',
+      },
       { icon: '⚔️', label: 'ATK', value: `${this.effectiveAtk}`, color: '#ff8844' },
       { icon: '💨', label: 'SPD', value: `${this.attacksPerSec.toFixed(2)}/s`, color: '#66ccff' },
-      { icon: '🛡️', label: 'DEF', value: `${Math.floor(this.defenseRate * 100)}%`, color: '#4488cc' },
-      { icon: '🎯', label: 'CRIT', value: `${Math.floor(this.critChance * 100)}%`, color: '#ffaa00' },
-      { icon: '🩸', label: '흡혈', value: `${(this.lifestealRate * 100).toFixed(1)}%`, color: '#cc4488' },
+      {
+        icon: '🛡️',
+        label: 'DEF',
+        value: `${Math.floor(this.defenseRate * 100)}%`,
+        color: '#4488cc',
+      },
+      {
+        icon: '🎯',
+        label: 'CRIT',
+        value: `${Math.floor(this.critChance * 100)}%`,
+        color: '#ffaa00',
+      },
+      {
+        icon: '🩸',
+        label: '흡혈',
+        value: `${(this.lifestealRate * 100).toFixed(1)}%`,
+        color: '#cc4488',
+      },
     ];
 
     const gap = 6;
@@ -2373,10 +2987,16 @@ export class GameScene extends Phaser.Scene {
 
     stats.forEach((s, i) => {
       const sx = startX + i * (itemW + gap);
-      const txt = this.add.text(sx, by, `${s.icon} ${s.label} ${s.value}`, {
-        fontSize: '10px', color: s.color, fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 2,
-      }).setDepth(53);
+      const txt = this.add
+        .text(sx, by, `${s.icon} ${s.label} ${s.value}`, {
+          fontSize: '10px',
+          color: s.color,
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setDepth(53);
       this.buffBarContainer!.add(txt);
     });
   }
@@ -2399,14 +3019,29 @@ export class GameScene extends Phaser.Scene {
     const sx = SLOT_XS[0];
     const container = this.add.container(sx + SLOT_W / 2 - 2, SLOT_Y - SLOT_H / 2 + 2).setDepth(55);
     const bg = this.add.graphics();
-    bg.fillStyle(0x228833, 0.9); bg.fillRoundedRect(-22, -8, 44, 16, 4);
-    bg.lineStyle(1, 0x44ff66, 0.8); bg.strokeRoundedRect(-22, -8, 44, 16, 4);
-    const txt = this.add.text(0, 0, 'AUTO', {
-      fontSize: '9px', color: '#44ff66', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5);
+    bg.fillStyle(0x228833, 0.9);
+    bg.fillRoundedRect(-22, -8, 44, 16, 4);
+    bg.lineStyle(1, 0x44ff66, 0.8);
+    bg.strokeRoundedRect(-22, -8, 44, 16, 4);
+    const txt = this.add
+      .text(0, 0, 'AUTO', {
+        fontSize: '9px',
+        color: '#44ff66',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5);
     container.add([bg, txt]);
-    this.tweens.add({ targets: container, alpha: 0.5, duration: 800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({
+      targets: container,
+      alpha: 0.5,
+      duration: 800,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
     this.autoAttackBadge = container;
   }
 
@@ -2417,8 +3052,11 @@ export class GameScene extends Phaser.Scene {
     const def = ALL_SKILL_DEFS[skillId];
     if (!def) return;
     const btn = new SkillButton(this, SLOT_XS[idx], SLOT_Y, SLOT_W, SLOT_H, {
-      name: def.name, icon: def.icon, cooldown: this.skillCd(skillId),
-      color: def.btnColor, hoverColor: def.btnHover,
+      name: def.name,
+      icon: def.icon,
+      cooldown: this.skillCd(skillId),
+      color: def.btnColor,
+      hoverColor: def.btnHover,
     });
     btn.skillId = skillId;
     btn.on('activate', () => this.onSkillActivate(idx));
@@ -2431,7 +3069,14 @@ export class GameScene extends Phaser.Scene {
     this.skillButtons[idx] = btn;
     if (this.emptySlotGfx[idx]) this.emptySlotGfx[idx].setVisible(false);
     if (animate) {
-      this.tweens.add({ targets: btn, scaleX: 1.2, scaleY: 1.2, duration: 150, yoyo: true, ease: 'Back.easeOut' });
+      this.tweens.add({
+        targets: btn,
+        scaleX: 1.2,
+        scaleY: 1.2,
+        duration: 150,
+        yoyo: true,
+        ease: 'Back.easeOut',
+      });
     }
     if (idx === 0 && this.isBasicAttackId(skillId) && this.autoAttackEnabled) {
       this.showAutoAttackBadge();
@@ -2451,39 +3096,76 @@ export class GameScene extends Phaser.Scene {
     const { x, y, w, h } = SHOP_BTN;
     this.shopBtnBg = this.add.graphics().setDepth(50);
     this.drawBottomBtn(this.shopBtnBg, x, y, w, h, 0x443820, 0xaa8833, false);
-    this.add.text(x, y, '🛒 상점', {
-      fontSize: '14px', color: '#ffffff', fontFamily: 'Arial, sans-serif', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(51);
+    this.add
+      .text(x, y, '🛒 상점', {
+        fontSize: '14px',
+        color: '#ffffff',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(51);
     const z = this.add.zone(x, y, w, h).setInteractive({ useHandCursor: true }).setDepth(52);
-    z.on('pointerdown', () => { if (!this.gameOver && !this.cardSelecting && !this.doorSelecting) this.toggleShop(); });
-    z.on('pointerover', () => this.drawBottomBtn(this.shopBtnBg, x, y, w, h, 0x5a4a2a, 0xccaa55, true));
-    z.on('pointerout', () => this.drawBottomBtn(this.shopBtnBg, x, y, w, h, 0x443820, 0xaa8833, false));
+    z.on('pointerdown', () => {
+      if (!this.gameOver && !this.cardSelecting && !this.doorSelecting) this.toggleShop();
+    });
+    z.on('pointerover', () =>
+      this.drawBottomBtn(this.shopBtnBg, x, y, w, h, 0x5a4a2a, 0xccaa55, true),
+    );
+    z.on('pointerout', () =>
+      this.drawBottomBtn(this.shopBtnBg, x, y, w, h, 0x443820, 0xaa8833, false),
+    );
   }
 
   private createRelicButton() {
     const { x, y, w, h } = RELIC_BTN;
     this.relicBtnBg = this.add.graphics().setDepth(50);
     this.drawBottomBtn(this.relicBtnBg, x, y, w, h, 0x332255, 0x8855cc, false);
-    this.add.text(x, y, '💎 유물', {
-      fontSize: '14px', color: '#ffffff', fontFamily: 'Arial, sans-serif', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(51);
+    this.add
+      .text(x, y, '💎 유물', {
+        fontSize: '14px',
+        color: '#ffffff',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+      })
+      .setOrigin(0.5)
+      .setDepth(51);
     const z = this.add.zone(x, y, w, h).setInteractive({ useHandCursor: true }).setDepth(52);
-    z.on('pointerdown', () => { if (!this.gameOver && !this.cardSelecting && !this.doorSelecting) this.toggleRelic(); });
-    z.on('pointerover', () => this.drawBottomBtn(this.relicBtnBg, x, y, w, h, 0x4a3377, 0xaa77ee, true));
-    z.on('pointerout', () => this.drawBottomBtn(this.relicBtnBg, x, y, w, h, 0x332255, 0x8855cc, false));
+    z.on('pointerdown', () => {
+      if (!this.gameOver && !this.cardSelecting && !this.doorSelecting) this.toggleRelic();
+    });
+    z.on('pointerover', () =>
+      this.drawBottomBtn(this.relicBtnBg, x, y, w, h, 0x4a3377, 0xaa77ee, true),
+    );
+    z.on('pointerout', () =>
+      this.drawBottomBtn(this.relicBtnBg, x, y, w, h, 0x332255, 0x8855cc, false),
+    );
   }
 
-  private drawBottomBtn(gfx: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, fill: number, border: number, _hover: boolean) {
+  private drawBottomBtn(
+    gfx: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    fill: number,
+    border: number,
+    _hover: boolean,
+  ) {
     gfx.clear();
-    gfx.fillStyle(fill, 1); gfx.fillRoundedRect(x - w / 2, y - h / 2, w, h, 10);
-    gfx.lineStyle(2, border, 1); gfx.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 10);
+    gfx.fillStyle(fill, 1);
+    gfx.fillRoundedRect(x - w / 2, y - h / 2, w, h, 10);
+    gfx.lineStyle(2, border, 1);
+    gfx.strokeRoundedRect(x - w / 2, y - h / 2, w, h, 10);
   }
 
   /* ================================================================
      SHOP
      ================================================================ */
 
-  private toggleShop() { this.shopOpen ? this.closeOverlay() : this.openShop(); }
+  private toggleShop() {
+    this.shopOpen ? this.closeOverlay() : this.openShop();
+  }
 
   private openShop() {
     if (this.relicPanel?.isOpen) this.relicPanel.close();
@@ -2491,60 +3173,131 @@ export class GameScene extends Phaser.Scene {
     this.shopOpen = true;
     const els = this.overlayElements;
     const bg = this.add.graphics().setDepth(250).setAlpha(0);
-    bg.fillStyle(0x000000, 0.6); bg.fillRect(0, 0, 800, 600);
-    els.push(bg); this.tweens.add({ targets: bg, alpha: 1, duration: 200 });
+    bg.fillStyle(0x000000, 0.6);
+    bg.fillRect(0, 0, 800, 600);
+    els.push(bg);
+    this.tweens.add({ targets: bg, alpha: 1, duration: 200 });
 
     const panel = this.add.graphics().setDepth(251);
-    panel.fillStyle(0x1a1a30, 0.95); panel.fillRoundedRect(170, 100, 460, 370, 16);
-    panel.lineStyle(2, 0x4466aa, 0.8); panel.strokeRoundedRect(170, 100, 460, 370, 16);
+    panel.fillStyle(0x1a1a30, 0.95);
+    panel.fillRoundedRect(170, 100, 460, 370, 16);
+    panel.lineStyle(2, 0x4466aa, 0.8);
+    panel.strokeRoundedRect(170, 100, 460, 370, 16);
     els.push(panel);
-    els.push(this.add.text(400, 126, '🛒 상점', {
-      fontSize: '24px', color: '#ffd700', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(252));
-    const closeZ = this.add.zone(605, 115, 40, 30).setInteractive({ useHandCursor: true }).setDepth(253);
+    els.push(
+      this.add
+        .text(400, 126, '🛒 상점', {
+          fontSize: '24px',
+          color: '#ffd700',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(252),
+    );
+    const closeZ = this.add
+      .zone(605, 115, 40, 30)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(253);
     closeZ.on('pointerdown', () => this.closeOverlay());
     els.push(closeZ);
-    els.push(this.add.text(605, 115, '✕', {
-      fontSize: '20px', color: '#ff6666', fontFamily: 'Arial', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(252));
+    els.push(
+      this.add
+        .text(605, 115, '✕', {
+          fontSize: '20px',
+          color: '#ff6666',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setDepth(252),
+    );
 
     SHOP_ITEMS.forEach((item, i) => {
       const iy = 155 + i * 52;
       const price = Math.floor(item.cost * this.shopDiscount);
       const can = this.canBuyShopItem(i);
       const row = this.add.graphics().setDepth(251);
-      row.fillStyle(can ? 0x222244 : 0x1a1a28, 0.8); row.fillRoundedRect(190, iy, 420, 46, 8);
+      row.fillStyle(can ? 0x222244 : 0x1a1a28, 0.8);
+      row.fillRoundedRect(190, iy, 420, 46, 8);
       els.push(row);
       els.push(this.add.text(208, iy + 13, item.icon, { fontSize: '18px' }).setDepth(252));
-      els.push(this.add.text(234, iy + 8, item.name, {
-        fontSize: '14px', color: can ? '#ffffff' : '#666666', fontFamily: 'Arial', fontStyle: 'bold',
-      }).setDepth(252));
-      els.push(this.add.text(234, iy + 28, item.desc, {
-        fontSize: '10px', color: can ? '#aaaaaa' : '#555555', fontFamily: 'Arial',
-      }).setDepth(252));
+      els.push(
+        this.add
+          .text(234, iy + 8, item.name, {
+            fontSize: '14px',
+            color: can ? '#ffffff' : '#666666',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+          })
+          .setDepth(252),
+      );
+      els.push(
+        this.add
+          .text(234, iy + 28, item.desc, {
+            fontSize: '10px',
+            color: can ? '#aaaaaa' : '#555555',
+            fontFamily: 'Arial',
+          })
+          .setDepth(252),
+      );
       if (item.kind === 'potion' && !this.canAddPotion(item.potionLv!)) {
-        els.push(this.add.text(490, iy + 23, '슬롯 없음', {
-          fontSize: '10px', color: '#ff4444', fontFamily: 'Arial', stroke: '#000000', strokeThickness: 2,
-        }).setOrigin(0.5).setDepth(252));
+        els.push(
+          this.add
+            .text(490, iy + 23, '슬롯 없음', {
+              fontSize: '10px',
+              color: '#ff4444',
+              fontFamily: 'Arial',
+              stroke: '#000000',
+              strokeThickness: 2,
+            })
+            .setOrigin(0.5)
+            .setDepth(252),
+        );
       }
-      els.push(this.add.text(570, iy + 23, `${price}G`, {
-        fontSize: '15px', color: can ? '#ffd700' : '#664400',
-        fontFamily: 'Arial', fontStyle: 'bold', stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0.5).setDepth(252));
+      els.push(
+        this.add
+          .text(570, iy + 23, `${price}G`, {
+            fontSize: '15px',
+            color: can ? '#ffd700' : '#664400',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 2,
+          })
+          .setOrigin(0.5)
+          .setDepth(252),
+      );
       if (can) {
-        const bz = this.add.zone(570, iy + 23, 80, 42).setInteractive({ useHandCursor: true }).setDepth(253);
+        const bz = this.add
+          .zone(570, iy + 23, 80, 42)
+          .setInteractive({ useHandCursor: true })
+          .setDepth(253);
         bz.on('pointerdown', () => this.buyShopItem(i));
         els.push(bz);
       }
     });
-    els.push(this.add.text(400, 430, `보유: ${this.gold}G`, {
-      fontSize: '14px', color: '#ccaa44', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(252));
+    els.push(
+      this.add
+        .text(400, 430, `보유: ${this.gold}G`, {
+          fontSize: '14px',
+          color: '#ccaa44',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+        .setDepth(252),
+    );
 
     if (this.shopFromDoor) {
-      const cx = 400, cy = 468, cw = 200, ch = 36;
+      const cx = 400,
+        cy = 468,
+        cw = 200,
+        ch = 36;
       const cG = this.add.graphics().setDepth(251);
       const drawCont = (hover: boolean) => {
         cG.clear();
@@ -2555,10 +3308,21 @@ export class GameScene extends Phaser.Scene {
       };
       drawCont(false);
       els.push(cG);
-      els.push(this.add.text(cx, cy, '계속하기', {
-        fontSize: '16px', color: '#ffffff', fontFamily: 'Arial', fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(252));
-      const cz = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true }).setDepth(253);
+      els.push(
+        this.add
+          .text(cx, cy, '계속하기', {
+            fontSize: '16px',
+            color: '#ffffff',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+          })
+          .setOrigin(0.5)
+          .setDepth(252),
+      );
+      const cz = this.add
+        .zone(cx, cy, cw, ch)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(253);
       cz.on('pointerover', () => drawCont(true));
       cz.on('pointerout', () => drawCont(false));
       cz.on('pointerdown', () => this.closeOverlay());
@@ -2586,20 +3350,26 @@ export class GameScene extends Phaser.Scene {
       if (item.buffType === 'atk') this.startAtkBuff();
       else if (item.buffType === 'invincible') this.startInvincibility();
     }
-    this.updateUI(); this.closeOverlay();
+    this.updateUI();
+    this.closeOverlay();
   }
 
   private startAtkBuff() {
     this.atkBuffActive = true;
     this.atkBuffTimer?.remove();
-    this.atkBuffTimer = this.time.delayedCall(30000, () => { this.atkBuffActive = false; this.updateUI(); });
+    this.atkBuffTimer = this.time.delayedCall(30000, () => {
+      this.atkBuffActive = false;
+      this.updateUI();
+    });
     this.updateUI();
   }
 
   private startInvincibility() {
     this.invincible = true;
     this.invincibleTimer?.remove();
-    this.invincibleTimer = this.time.delayedCall(5000, () => { this.invincible = false; });
+    this.invincibleTimer = this.time.delayedCall(5000, () => {
+      this.invincible = false;
+    });
   }
 
   /* ================================================================
@@ -2656,16 +3426,36 @@ export class GameScene extends Phaser.Scene {
 
   private playSfxForType(sfx: SfxType) {
     switch (sfx) {
-      case 'hit': SoundManager.sfxHit(); break;
-      case 'fire': SoundManager.sfxFireball(); break;
-      case 'ice': SoundManager.sfxIce(); break;
-      case 'lightning': SoundManager.sfxLightning(); break;
-      case 'poison': SoundManager.sfxPoison(); break;
-      case 'explosion': SoundManager.sfxExplosion(); break;
-      case 'shield': SoundManager.sfxShield(); break;
-      case 'buff': SoundManager.sfxBuff(); break;
-      case 'debuff': SoundManager.sfxDebuff(); break;
-      case 'stealth': SoundManager.sfxStealth(); break;
+      case 'hit':
+        SoundManager.sfxHit();
+        break;
+      case 'fire':
+        SoundManager.sfxFireball();
+        break;
+      case 'ice':
+        SoundManager.sfxIce();
+        break;
+      case 'lightning':
+        SoundManager.sfxLightning();
+        break;
+      case 'poison':
+        SoundManager.sfxPoison();
+        break;
+      case 'explosion':
+        SoundManager.sfxExplosion();
+        break;
+      case 'shield':
+        SoundManager.sfxShield();
+        break;
+      case 'buff':
+        SoundManager.sfxBuff();
+        break;
+      case 'debuff':
+        SoundManager.sfxDebuff();
+        break;
+      case 'stealth':
+        SoundManager.sfxStealth();
+        break;
     }
   }
 
@@ -2674,14 +3464,30 @@ export class GameScene extends Phaser.Scene {
     const mult = skillMult(def.id, level);
 
     switch (def.effectType) {
-      case 'single_dmg': this.execSingleDmg(def, mult); break;
-      case 'multi_hit': this.execMultiHit(def, mult); break;
-      case 'aoe': this.execAoe(def, mult); break;
-      case 'dot': this.execDot(def, mult); break;
-      case 'buff_self': this.execBuffSelf(def); break;
-      case 'debuff_enemy': this.execDebuffEnemy(def, mult); break;
-      case 'stealth': this.execStealth(def); break;
-      case 'reflect': this.execReflect(def); break;
+      case 'single_dmg':
+        this.execSingleDmg(def, mult);
+        break;
+      case 'multi_hit':
+        this.execMultiHit(def, mult);
+        break;
+      case 'aoe':
+        this.execAoe(def, mult);
+        break;
+      case 'dot':
+        this.execDot(def, mult);
+        break;
+      case 'buff_self':
+        this.execBuffSelf(def);
+        break;
+      case 'debuff_enemy':
+        this.execDebuffEnemy(def, mult);
+        break;
+      case 'stealth':
+        this.execStealth(def);
+        break;
+      case 'reflect':
+        this.execReflect(def);
+        break;
     }
 
     if (def.dotSeconds && def.effectType === 'single_dmg') {
@@ -2690,12 +3496,15 @@ export class GameScene extends Phaser.Scene {
     if (def.dotSeconds && def.effectType === 'aoe') {
       this.startAoeDot(def, mult, def.dotSeconds);
     }
-    if (def.debuffEffect && def.debuffDuration &&
-        def.effectType !== 'debuff_enemy') {
+    if (def.debuffEffect && def.debuffDuration && def.effectType !== 'debuff_enemy') {
       this.applyDebuff(def.debuffEffect, def.debuffDuration);
     }
-    if (def.buffEffect && def.buffDuration &&
-        def.effectType !== 'buff_self' && def.effectType !== 'reflect') {
+    if (
+      def.buffEffect &&
+      def.buffDuration &&
+      def.effectType !== 'buff_self' &&
+      def.effectType !== 'reflect'
+    ) {
       this.applyBuff(def.buffEffect, def.buffDuration);
     }
   }
@@ -2705,7 +3514,14 @@ export class GameScene extends Phaser.Scene {
     let dmg = Math.floor(this.effectiveAtk * mult * this.skillDamageMult);
     if (def.id === 'r_assassinate' && this.stealthActive) dmg *= 2;
     const dead = t.takeDamageColored(dmg, def.color);
-    DamageText.show(this, t.x, t.y - 40, dmg, '#' + def.color.toString(16).padStart(6, '0'), '32px');
+    DamageText.show(
+      this,
+      t.x,
+      t.y - 40,
+      dmg,
+      '#' + def.color.toString(16).padStart(6, '0'),
+      '32px',
+    );
     this.showSkillVfx(t.x, t.y, def.color, 'single');
     this.applyLifesteal(dmg);
     if (dead) this.handleMonsterKill(t);
@@ -2720,8 +3536,14 @@ export class GameScene extends Phaser.Scene {
         if (this.gameOver || t.isDead) return;
         const dead = t.takeDamageColored(dmgPer, def.color);
         const ox = Phaser.Math.Between(-15, 15);
-        DamageText.show(this, t.x + ox, t.y - 40 - i * 12, dmgPer,
-          '#' + def.color.toString(16).padStart(6, '0'), '24px');
+        DamageText.show(
+          this,
+          t.x + ox,
+          t.y - 40 - i * 12,
+          dmgPer,
+          '#' + def.color.toString(16).padStart(6, '0'),
+          '24px',
+        );
         this.emitParticles(t.x, t.y, [def.color, 0xffffff], 3);
         this.applyLifesteal(dmgPer);
         if (dead) this.handleMonsterKill(t);
@@ -2735,7 +3557,12 @@ export class GameScene extends Phaser.Scene {
     DamageText.show(this, 400, 210, dmg, '#' + def.color.toString(16).padStart(6, '0'), '38px');
     this.showSkillVfx(400, 300, def.color, 'aoe');
     this.cameras.main.shake(250, 0.018);
-    this.cameras.main.flash(150, (def.color >> 16) & 0xff, (def.color >> 8) & 0xff, def.color & 0xff);
+    this.cameras.main.flash(
+      150,
+      (def.color >> 16) & 0xff,
+      (def.color >> 8) & 0xff,
+      def.color & 0xff,
+    );
     this.applyLifesteal(dmg);
     const alive = this.monsters.filter(m => !m.isDead);
     alive.forEach(m => {
@@ -2746,8 +3573,14 @@ export class GameScene extends Phaser.Scene {
 
   private execDot(def: SkillDef, mult: number) {
     const t = this.targetMonster!;
-    DamageText.show(this, t.x, t.y - 40, def.name + '!',
-      '#' + def.color.toString(16).padStart(6, '0'), '24px');
+    DamageText.show(
+      this,
+      t.x,
+      t.y - 40,
+      def.name + '!',
+      '#' + def.color.toString(16).padStart(6, '0'),
+      '24px',
+    );
     this.showSkillVfx(t.x, t.y, def.color, 'dot');
     const seconds = def.dotSeconds ?? 3;
     this.startDot(def, mult, seconds);
@@ -2756,13 +3589,20 @@ export class GameScene extends Phaser.Scene {
   private startDot(def: SkillDef, mult: number, seconds: number) {
     const tick = Math.floor(this.effectiveAtk * mult * this.skillDamageMult);
     const timer = this.time.addEvent({
-      delay: 1000, repeat: seconds - 1,
+      delay: 1000,
+      repeat: seconds - 1,
       callback: () => {
         const t = this.targetMonster;
         if (this.gameOver || !t || t.isDead) return;
         const dead = t.takeDamageColored(tick, def.color);
-        DamageText.show(this, t.x + Phaser.Math.Between(-20, 20), t.y - 30, tick,
-          '#' + def.color.toString(16).padStart(6, '0'), '20px');
+        DamageText.show(
+          this,
+          t.x + Phaser.Math.Between(-20, 20),
+          t.y - 30,
+          tick,
+          '#' + def.color.toString(16).padStart(6, '0'),
+          '20px',
+        );
         this.emitParticles(t.x, t.y, [def.color], 2);
         this.applyLifesteal(tick);
         if (dead) this.handleMonsterKill(t);
@@ -2774,14 +3614,21 @@ export class GameScene extends Phaser.Scene {
   private startAoeDot(def: SkillDef, mult: number, seconds: number) {
     const tick = Math.floor(this.effectiveAtk * mult * this.skillDamageMult * 0.5);
     const timer = this.time.addEvent({
-      delay: 1000, repeat: seconds - 1,
+      delay: 1000,
+      repeat: seconds - 1,
       callback: () => {
         if (this.gameOver) return;
         const alive = this.monsters.filter(m => !m.isDead);
         alive.forEach(m => {
           const dead = m.takeDamageColored(tick, def.color);
-          DamageText.show(this, m.x + Phaser.Math.Between(-10, 10), m.y - 20, tick,
-            '#' + def.color.toString(16).padStart(6, '0'), '16px');
+          DamageText.show(
+            this,
+            m.x + Phaser.Math.Between(-10, 10),
+            m.y - 20,
+            tick,
+            '#' + def.color.toString(16).padStart(6, '0'),
+            '16px',
+          );
           if (dead) this.handleMonsterKill(m);
         });
       },
@@ -2792,8 +3639,14 @@ export class GameScene extends Phaser.Scene {
   private execBuffSelf(def: SkillDef) {
     if (!def.buffEffect || !def.buffDuration) return;
     this.applyBuff(def.buffEffect, def.buffDuration);
-    DamageText.show(this, 400, 120, `✦ ${def.name}!`,
-      '#' + def.color.toString(16).padStart(6, '0'), '24px');
+    DamageText.show(
+      this,
+      400,
+      120,
+      `✦ ${def.name}!`,
+      '#' + def.color.toString(16).padStart(6, '0'),
+      '24px',
+    );
     this.showSkillVfx(400, 300, def.color, 'buff');
   }
 
@@ -2801,37 +3654,52 @@ export class GameScene extends Phaser.Scene {
     switch (effect) {
       case 'def70':
         this.shieldDmgReduce = 0.7;
-        this.time.delayedCall(duration * 1000, () => { this.shieldDmgReduce = 0; });
+        this.time.delayedCall(duration * 1000, () => {
+          this.shieldDmgReduce = 0;
+        });
         DamageText.show(this, 400, 100, '🛡 방어 +70%!', '#88ccff', '18px');
         break;
       case 'def50':
         this.shieldDmgReduce = 0.5;
-        this.time.delayedCall(duration * 1000, () => { this.shieldDmgReduce = 0; });
+        this.time.delayedCall(duration * 1000, () => {
+          this.shieldDmgReduce = 0;
+        });
         break;
       case 'warcry':
         this.warcryActive = true;
-        this.time.delayedCall(duration * 1000, () => { this.warcryActive = false; });
+        this.time.delayedCall(duration * 1000, () => {
+          this.warcryActive = false;
+        });
         DamageText.show(this, 400, 100, '📣 ATK +50%! SPD +30%!', '#ff8844', '18px');
         break;
       case 'mana_overload':
         this.manaOverloadActive = true;
-        this.time.delayedCall(duration * 1000, () => { this.manaOverloadActive = false; });
+        this.time.delayedCall(duration * 1000, () => {
+          this.manaOverloadActive = false;
+        });
         DamageText.show(this, 400, 100, '🔮 스킬 데미지 ×3!', '#aa44ff', '20px');
         break;
       case 'shadow_clone':
         this.shadowCloneActive = true;
         this.shadowCloneMult = skillMult('r_shadow_clone', this.skillLevels['r_shadow_clone'] ?? 1);
-        this.time.delayedCall(duration * 1000, () => { this.shadowCloneActive = false; this.shadowCloneMult = 0; });
+        this.time.delayedCall(duration * 1000, () => {
+          this.shadowCloneActive = false;
+          this.shadowCloneMult = 0;
+        });
         DamageText.show(this, 400, 100, '👥 분신 생성!', '#7755bb', '18px');
         break;
       case 'dodge50':
         this.dodgeChance = 0.5;
-        this.time.delayedCall(duration * 1000, () => { this.dodgeChance = 0; });
+        this.time.delayedCall(duration * 1000, () => {
+          this.dodgeChance = 0;
+        });
         DamageText.show(this, 400, 100, '💨 회피율 +50%!', '#888888', '18px');
         break;
       case 'crit30':
         this.tempCritBonus += 0.3;
-        this.time.delayedCall(duration * 1000, () => { this.tempCritBonus = Math.max(0, this.tempCritBonus - 0.3); });
+        this.time.delayedCall(duration * 1000, () => {
+          this.tempCritBonus = Math.max(0, this.tempCritBonus - 0.3);
+        });
         DamageText.show(this, 400, 100, '🎯 CRIT +30%!', '#ffaa00', '18px');
         break;
     }
@@ -2845,15 +3713,30 @@ export class GameScene extends Phaser.Scene {
       const dmg = Math.floor(this.effectiveAtk * mult * this.skillDamageMult);
       if (dmg > 0) {
         const dead = t.takeDamageColored(dmg, def.color);
-        DamageText.show(this, t.x, t.y - 40, dmg,
-          '#' + def.color.toString(16).padStart(6, '0'), '28px');
+        DamageText.show(
+          this,
+          t.x,
+          t.y - 40,
+          dmg,
+          '#' + def.color.toString(16).padStart(6, '0'),
+          '28px',
+        );
         this.applyLifesteal(dmg);
-        if (dead) { this.handleMonsterKill(t); return; }
+        if (dead) {
+          this.handleMonsterKill(t);
+          return;
+        }
       }
     }
     this.applyDebuff(def.debuffEffect, def.debuffDuration);
-    DamageText.show(this, 400, 130, `${def.icon} ${def.name}!`,
-      '#' + def.color.toString(16).padStart(6, '0'), '20px');
+    DamageText.show(
+      this,
+      400,
+      130,
+      `${def.icon} ${def.name}!`,
+      '#' + def.color.toString(16).padStart(6, '0'),
+      '20px',
+    );
     this.showSkillVfx(this.targetMonster!.x, this.targetMonster!.y, def.color, 'debuff');
     if (def.buffEffect && def.buffDuration) {
       this.applyBuff(def.buffEffect, def.buffDuration);
@@ -2886,7 +3769,8 @@ export class GameScene extends Phaser.Scene {
         this.monsterWeakened = true;
         this.monsterWeakenPct = 0.3;
         this.time.delayedCall(duration * 1000, () => {
-          this.monsterWeakened = false; this.monsterWeakenPct = 0;
+          this.monsterWeakened = false;
+          this.monsterWeakenPct = 0;
         });
         DamageText.show(this, 400, 160, '😤 약화!', '#cc8844', '18px');
         break;
@@ -2915,10 +3799,17 @@ export class GameScene extends Phaser.Scene {
     this.reflectActive = true;
     this.reflectPct = pct;
     this.time.delayedCall(dur * 1000, () => {
-      this.reflectActive = false; this.reflectPct = 0;
+      this.reflectActive = false;
+      this.reflectPct = 0;
     });
-    DamageText.show(this, 400, 120, `🔄 반격 ${Math.floor(pct * 100)}%!`,
-      '#' + def.color.toString(16).padStart(6, '0'), '22px');
+    DamageText.show(
+      this,
+      400,
+      120,
+      `🔄 반격 ${Math.floor(pct * 100)}%!`,
+      '#' + def.color.toString(16).padStart(6, '0'),
+      '22px',
+    );
     this.showSkillVfx(400, 300, def.color, 'buff');
     this.updateBuffBar();
   }
@@ -2931,26 +3822,58 @@ export class GameScene extends Phaser.Scene {
     if (type === 'aoe') {
       this.emitParticles(x, y, [color, lighterColor, 0xffffff], 16);
       const flash = this.add.graphics().setDepth(150).setAlpha(0.3);
-      flash.fillStyle(color, 1); flash.fillRect(0, 0, 800, 600);
-      this.tweens.add({ targets: flash, alpha: 0, duration: 350, onComplete: () => flash.destroy() });
+      flash.fillStyle(color, 1);
+      flash.fillRect(0, 0, 800, 600);
+      this.tweens.add({
+        targets: flash,
+        alpha: 0,
+        duration: 350,
+        onComplete: () => flash.destroy(),
+      });
       const ring = this.add.graphics().setDepth(89).setAlpha(0.6);
-      ring.lineStyle(5, color, 1); ring.strokeCircle(x, y, 15);
-      this.tweens.add({ targets: ring, scaleX: 8, scaleY: 6, alpha: 0, duration: 450, onComplete: () => ring.destroy() });
+      ring.lineStyle(5, color, 1);
+      ring.strokeCircle(x, y, 15);
+      this.tweens.add({
+        targets: ring,
+        scaleX: 8,
+        scaleY: 6,
+        alpha: 0,
+        duration: 450,
+        onComplete: () => ring.destroy(),
+      });
     } else if (type === 'single') {
       this.emitParticles(x, y, [color, lighterColor], 8);
       this.cameras.main.shake(60, 0.005);
       const circle = this.add.graphics().setDepth(89).setAlpha(0.7);
-      circle.lineStyle(3, color, 1); circle.strokeCircle(x, y, 10);
-      circle.fillStyle(darkerColor, 0.2); circle.fillCircle(x, y, 10);
-      this.tweens.add({ targets: circle, scaleX: 4, scaleY: 4, alpha: 0, duration: 300, onComplete: () => circle.destroy() });
+      circle.lineStyle(3, color, 1);
+      circle.strokeCircle(x, y, 10);
+      circle.fillStyle(darkerColor, 0.2);
+      circle.fillCircle(x, y, 10);
+      this.tweens.add({
+        targets: circle,
+        scaleX: 4,
+        scaleY: 4,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => circle.destroy(),
+      });
     } else if (type === 'dot') {
       for (let i = 0; i < 4; i++) {
-        const bx = x + Phaser.Math.Between(-40, 40), by = y + Phaser.Math.Between(-20, 20);
+        const bx = x + Phaser.Math.Between(-40, 40),
+          by = y + Phaser.Math.Between(-20, 20);
         const bubble = this.add.graphics().setDepth(89).setAlpha(0.6);
         const sz = Phaser.Math.Between(3, 6);
-        bubble.fillStyle(color, 0.5); bubble.fillCircle(0, 0, sz);
+        bubble.fillStyle(color, 0.5);
+        bubble.fillCircle(0, 0, sz);
         bubble.setPosition(bx, by);
-        this.tweens.add({ targets: bubble, y: by - 50, alpha: 0, duration: 600, delay: i * 80, onComplete: () => bubble.destroy() });
+        this.tweens.add({
+          targets: bubble,
+          y: by - 50,
+          alpha: 0,
+          duration: 600,
+          delay: i * 80,
+          onComplete: () => bubble.destroy(),
+        });
       }
     } else if (type === 'buff') {
       this.emitParticles(x, y, [color, lighterColor, 0xffffff], 10);
@@ -2963,7 +3886,10 @@ export class GameScene extends Phaser.Scene {
 
   private applyLifesteal(dmg: number) {
     if (this.lifestealRate <= 0) return;
-    this.playerHp = Math.min(this.playerHp + Math.max(1, Math.floor(dmg * this.lifestealRate)), this.playerMaxHp);
+    this.playerHp = Math.min(
+      this.playerHp + Math.max(1, Math.floor(dmg * this.lifestealRate)),
+      this.playerMaxHp,
+    );
     this.drawPlayerHpBar();
   }
 
@@ -3001,8 +3927,10 @@ export class GameScene extends Phaser.Scene {
     const { x, y, w, h } = XP_BAR;
     const obj = { r: Phaser.Math.Clamp(fromRatio, 0, 1) };
     this.tweens.add({
-      targets: obj, r: Phaser.Math.Clamp(toRatio, 0, 1),
-      duration: 500, ease: 'Sine.easeOut',
+      targets: obj,
+      r: Phaser.Math.Clamp(toRatio, 0, 1),
+      duration: 500,
+      ease: 'Sine.easeOut',
       onUpdate: () => {
         const fw = w * obj.r;
         this.xpBarFill.clear();
@@ -3023,27 +3951,56 @@ export class GameScene extends Phaser.Scene {
     ring1.fillStyle(0xffd700, 0.12);
     ring1.fillCircle(400, 300, 20);
     this.tweens.add({
-      targets: ring1, scaleX: 6, scaleY: 6, alpha: 0,
-      duration: 700, ease: 'Quad.easeOut', onComplete: () => ring1.destroy(),
+      targets: ring1,
+      scaleX: 6,
+      scaleY: 6,
+      alpha: 0,
+      duration: 700,
+      ease: 'Quad.easeOut',
+      onComplete: () => ring1.destroy(),
     });
     const ring2 = this.add.graphics().setDepth(95).setAlpha(0.5);
     ring2.lineStyle(2, 0xffaa00, 1);
     ring2.strokeCircle(400, 300, 12);
     this.tweens.add({
-      targets: ring2, scaleX: 10, scaleY: 10, alpha: 0,
-      duration: 900, delay: 100, ease: 'Quad.easeOut', onComplete: () => ring2.destroy(),
+      targets: ring2,
+      scaleX: 10,
+      scaleY: 10,
+      alpha: 0,
+      duration: 900,
+      delay: 100,
+      ease: 'Quad.easeOut',
+      onComplete: () => ring2.destroy(),
     });
     SoundManager.sfxLevelUp();
-    const lvText = this.add.text(400, 280, 'LEVEL UP!', {
-      fontSize: '42px', color: '#ffd700', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 7,
-    }).setOrigin(0.5).setDepth(96).setScale(0.3).setAlpha(0);
+    const lvText = this.add
+      .text(400, 280, 'LEVEL UP!', {
+        fontSize: '42px',
+        color: '#ffd700',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 7,
+      })
+      .setOrigin(0.5)
+      .setDepth(96)
+      .setScale(0.3)
+      .setAlpha(0);
     this.tweens.add({
-      targets: lvText, scale: 1.2, alpha: 1, duration: 300, ease: 'Back.easeOut',
+      targets: lvText,
+      scale: 1.2,
+      alpha: 1,
+      duration: 300,
+      ease: 'Back.easeOut',
       onComplete: () => {
         this.tweens.add({
-          targets: lvText, scale: 1.5, alpha: 0, y: 230,
-          duration: 600, delay: 500, ease: 'Quad.easeIn',
+          targets: lvText,
+          scale: 1.5,
+          alpha: 0,
+          y: 230,
+          duration: 600,
+          delay: 500,
+          ease: 'Quad.easeIn',
           onComplete: () => lvText.destroy(),
         });
       },
@@ -3056,24 +4013,46 @@ export class GameScene extends Phaser.Scene {
     if (this.cardSelecting && this.overlayElements.length > 0) return;
     this.cardSelecting = true;
     if (this.shopOpen) this.closeOverlay();
-    if (this.relicPanel?.isOpen) { this.relicPanel.close(); this.relicOpen = false; }
+    if (this.relicPanel?.isOpen) {
+      this.relicPanel.close();
+      this.relicOpen = false;
+    }
     const els = this.overlayElements;
 
     const bg = this.add.graphics().setDepth(300).setAlpha(0);
-    bg.fillStyle(0x000000, 0.7); bg.fillRect(0, 0, 800, 600);
-    els.push(bg); this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
+    bg.fillStyle(0x000000, 0.7);
+    bg.fillRect(0, 0, 800, 600);
+    els.push(bg);
+    this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
 
     const titleStr = skillOnly ? '⚔ 스킬을 선택하세요!' : '⬆ LEVEL UP!';
-    const title = this.add.text(400, 90, titleStr, {
-      fontSize: '36px', color: '#ffdd44', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 6,
-    }).setOrigin(0.5).setDepth(301).setScale(0);
+    const title = this.add
+      .text(400, 90, titleStr, {
+        fontSize: '36px',
+        color: '#ffdd44',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setDepth(301)
+      .setScale(0);
     els.push(title);
     this.tweens.add({ targets: title, scale: 1, duration: 400, delay: 100, ease: 'Back.easeOut' });
 
-    els.push(this.add.text(400, 125, skillOnly ? '스킬을 획득하세요' : '카드를 선택하세요', {
-      fontSize: '16px', color: '#cccccc', fontFamily: 'Arial', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(301));
+    els.push(
+      this.add
+        .text(400, 125, skillOnly ? '스킬을 획득하세요' : '카드를 선택하세요', {
+          fontSize: '16px',
+          color: '#cccccc',
+          fontFamily: 'Arial',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+        .setDepth(301),
+    );
 
     if (skillOnly) {
       this.showSkillCardPicks(els);
@@ -3147,14 +4126,17 @@ export class GameScene extends Phaser.Scene {
 
     const autoCard = AUTO_ATK_CARDS[this.selectedClass.id];
     const total = statPicks.length + 1;
-    const cw = 180, gap = 20;
+    const cw = 180,
+      gap = 20;
     const totalW = total * cw + (total - 1) * gap;
     const startX = 400 - totalW / 2 + cw / 2;
 
     const autoIdx = Phaser.Math.Between(0, total - 1);
     let statI = 0;
     for (let i = 0; i < total; i++) {
-      const cx = startX + i * (cw + gap), cy = 280, ch = 240;
+      const cx = startX + i * (cw + gap),
+        cy = 280,
+        ch = 240;
       if (i === autoIdx) {
         this.renderAutoAtkCard(cx, cy, cw, ch, autoCard, els);
       } else {
@@ -3216,7 +4198,11 @@ export class GameScene extends Phaser.Scene {
     this.renderMixedCards(statPicks, rarities, [skillPick], els);
   }
 
-  private renderStatCards(picks: CardDef[], rarities: CardRarity[], els: Phaser.GameObjects.GameObject[]) {
+  private renderStatCards(
+    picks: CardDef[],
+    rarities: CardRarity[],
+    els: Phaser.GameObjects.GameObject[],
+  ) {
     const synergyCompletingIds = new Set<string>();
     for (const syn of SYNERGIES) {
       if (this.activeSynergies.includes(syn.id)) continue;
@@ -3230,38 +4216,93 @@ export class GameScene extends Phaser.Scene {
     const startX = 400 - totalW / 2 + cw / 2;
 
     picks.forEach((card, i) => {
-      const cx = startX + i * (cw + gap), cy = 280, ch = 240;
+      const cx = startX + i * (cw + gap),
+        cy = 280,
+        ch = 240;
       const rarity = rarities[i];
       const rc = RARITY_COLORS[rarity];
       const curLv = this.cardLevels[card.id] ?? 0;
       const nextLv = curLv + 1;
-      const perPick = rarity === 'legendary' ? card.legendValue : rarity === 'rare' ? card.rareValue : card.baseValue;
+      const perPick =
+        rarity === 'legendary'
+          ? card.legendValue
+          : rarity === 'rare'
+            ? card.rareValue
+            : card.baseValue;
       const nextVal = cv(card.baseValue, curLv) + perPick + (this.cardRarityBonus[card.id] ?? 0);
       const isNew = curLv === 0;
       const completesSynergy = synergyCompletingIds.has(card.id) && curLv === 0;
 
-      const allParts = this.drawCardUI(cx, cy, cw, ch, {
-        icon: card.icon, name: card.name, color: card.color,
-        desc: card.descFn(perPick), rarity, rc, isNew, isSkill: false,
-        curLv, legendaryDesc: (rarity === 'legendary' && LEGENDARY_DESCS[card.id]) ? LEGENDARY_DESCS[card.id] : null,
-        cdText: null,
-        synergyName: completesSynergy
-          ? SYNERGIES.find(s => s.requires.includes(card.id) && s.requires.filter(r => (this.cardLevels[r] ?? 0) === 0).length === 1)?.name ?? null
-          : null,
-      }, els, i, picks.length);
+      const allParts = this.drawCardUI(
+        cx,
+        cy,
+        cw,
+        ch,
+        {
+          icon: card.icon,
+          name: card.name,
+          color: card.color,
+          desc: card.descFn(perPick),
+          rarity,
+          rc,
+          isNew,
+          isSkill: false,
+          curLv,
+          legendaryDesc:
+            rarity === 'legendary' && LEGENDARY_DESCS[card.id] ? LEGENDARY_DESCS[card.id] : null,
+          cdText: null,
+          synergyName: completesSynergy
+            ? (SYNERGIES.find(
+                s =>
+                  s.requires.includes(card.id) &&
+                  s.requires.filter(r => (this.cardLevels[r] ?? 0) === 0).length === 1,
+              )?.name ?? null)
+            : null,
+        },
+        els,
+        i,
+        picks.length,
+      );
 
-      const zone = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true }).setDepth(303);
-      zone.on('pointerover', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1.05, scaleY: 1.05, duration: 100 }));
-      zone.on('pointerout', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }));
+      const zone = this.add
+        .zone(cx, cy, cw, ch)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(303);
+      zone.on('pointerover', () =>
+        this.tweens.add({
+          targets: [...allParts, zone],
+          scaleX: 1.05,
+          scaleY: 1.05,
+          duration: 100,
+        }),
+      );
+      zone.on('pointerout', () =>
+        this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }),
+      );
       zone.on('pointerdown', () => this.pickStatCard(card.id, rarity));
       els.push(zone);
     });
   }
 
-  private renderSingleStatCard(cx: number, cy: number, cw: number, ch: number, card: CardDef, rarity: CardRarity, els: Phaser.GameObjects.GameObject[], i: number, total: number) {
+  private renderSingleStatCard(
+    cx: number,
+    cy: number,
+    cw: number,
+    ch: number,
+    card: CardDef,
+    rarity: CardRarity,
+    els: Phaser.GameObjects.GameObject[],
+    i: number,
+    total: number,
+  ) {
     const rc = RARITY_COLORS[rarity];
     const curLv = this.cardLevels[card.id] ?? 0;
-    const perPick = rarity === 'legendary' ? card.legendValue : rarity === 'rare' ? card.rareValue : card.baseValue;
+    const perPick =
+      rarity === 'legendary'
+        ? card.legendValue
+        : rarity === 'rare'
+          ? card.rareValue
+          : card.baseValue;
     const isNew = curLv === 0;
     const synergyCompletingIds = new Set<string>();
     for (const syn of SYNERGIES) {
@@ -3270,63 +4311,138 @@ export class GameScene extends Phaser.Scene {
       if (missing.length === 1) synergyCompletingIds.add(missing[0]);
     }
     const completesSynergy = synergyCompletingIds.has(card.id) && curLv === 0;
-    const allParts = this.drawCardUI(cx, cy, cw, ch, {
-      icon: card.icon, name: card.name, color: card.color,
-      desc: card.descFn(perPick), rarity, rc, isNew, isSkill: false,
-      curLv, legendaryDesc: (rarity === 'legendary' && LEGENDARY_DESCS[card.id]) ? LEGENDARY_DESCS[card.id] : null,
-      cdText: null,
-      synergyName: completesSynergy
-        ? SYNERGIES.find(s => s.requires.includes(card.id) && s.requires.filter(r => (this.cardLevels[r] ?? 0) === 0).length === 1)?.name ?? null
-        : null,
-    }, els, i, total);
-    const zone = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true }).setDepth(303);
-    zone.on('pointerover', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1.05, scaleY: 1.05, duration: 100 }));
-    zone.on('pointerout', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }));
+    const allParts = this.drawCardUI(
+      cx,
+      cy,
+      cw,
+      ch,
+      {
+        icon: card.icon,
+        name: card.name,
+        color: card.color,
+        desc: card.descFn(perPick),
+        rarity,
+        rc,
+        isNew,
+        isSkill: false,
+        curLv,
+        legendaryDesc:
+          rarity === 'legendary' && LEGENDARY_DESCS[card.id] ? LEGENDARY_DESCS[card.id] : null,
+        cdText: null,
+        synergyName: completesSynergy
+          ? (SYNERGIES.find(
+              s =>
+                s.requires.includes(card.id) &&
+                s.requires.filter(r => (this.cardLevels[r] ?? 0) === 0).length === 1,
+            )?.name ?? null)
+          : null,
+      },
+      els,
+      i,
+      total,
+    );
+    const zone = this.add
+      .zone(cx, cy, cw, ch)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(303);
+    zone.on('pointerover', () =>
+      this.tweens.add({ targets: [...allParts, zone], scaleX: 1.05, scaleY: 1.05, duration: 100 }),
+    );
+    zone.on('pointerout', () =>
+      this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }),
+    );
     zone.on('pointerdown', () => this.pickStatCard(card.id, rarity));
     els.push(zone);
   }
 
-  private renderAutoAtkCard(cx: number, cy: number, cw: number, ch: number, card: AutoAtkCardDef, els: Phaser.GameObjects.GameObject[]) {
+  private renderAutoAtkCard(
+    cx: number,
+    cy: number,
+    cw: number,
+    ch: number,
+    card: AutoAtkCardDef,
+    els: Phaser.GameObjects.GameObject[],
+  ) {
     const g = this.add.graphics().setDepth(301);
-    g.fillStyle(0x0a1a10, 0.95); g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 14);
-    g.lineStyle(3, 0x44ff66, 0.9); g.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 14);
+    g.fillStyle(0x0a1a10, 0.95);
+    g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 14);
+    g.lineStyle(3, 0x44ff66, 0.9);
+    g.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 14);
     els.push(g);
 
     const glow = this.add.graphics().setDepth(300);
-    glow.fillStyle(0x44ff66, 0.08); glow.fillRoundedRect(cx - cw / 2 - 4, cy - ch / 2 - 4, cw + 8, ch + 8, 16);
+    glow.fillStyle(0x44ff66, 0.08);
+    glow.fillRoundedRect(cx - cw / 2 - 4, cy - ch / 2 - 4, cw + 8, ch + 8, 16);
     this.tweens.add({ targets: glow, alpha: 0.3, duration: 600, yoyo: true, repeat: -1 });
     els.push(glow);
 
-    const icon = this.add.text(cx, cy - 70, card.icon, { fontSize: '32px' }).setOrigin(0.5).setDepth(302);
+    const icon = this.add
+      .text(cx, cy - 70, card.icon, { fontSize: '32px' })
+      .setOrigin(0.5)
+      .setDepth(302);
     els.push(icon);
-    const name = this.add.text(cx, cy - 38, card.name, {
-      fontSize: '15px', color: '#44ff66', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(302);
+    const name = this.add
+      .text(cx, cy - 38, card.name, {
+        fontSize: '15px',
+        color: '#44ff66',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(302);
     els.push(name);
-    const label = this.add.text(cx, cy - 18, '🔄 자동공격', {
-      fontSize: '11px', color: '#88ffaa', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(302);
+    const label = this.add
+      .text(cx, cy - 18, '🔄 자동공격', {
+        fontSize: '11px',
+        color: '#88ffaa',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(302);
     els.push(label);
 
-    const desc = this.add.text(cx, cy + 10, card.desc, {
-      fontSize: '11px', color: '#ccddcc', fontFamily: 'Arial',
-      stroke: '#000000', strokeThickness: 2,
-      wordWrap: { width: cw - 20 }, align: 'center',
-    }).setOrigin(0.5, 0).setDepth(302);
+    const desc = this.add
+      .text(cx, cy + 10, card.desc, {
+        fontSize: '11px',
+        color: '#ccddcc',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 2,
+        wordWrap: { width: cw - 20 },
+        align: 'center',
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(302);
     els.push(desc);
 
-    const hint = this.add.text(cx, cy + ch / 2 - 20, '기본 공격이 자동 발동!', {
-      fontSize: '10px', color: '#66dd88', fontFamily: 'Arial',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(302);
+    const hint = this.add
+      .text(cx, cy + ch / 2 - 20, '기본 공격이 자동 발동!', {
+        fontSize: '10px',
+        color: '#66dd88',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(302);
     els.push(hint);
 
-    const zone = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true }).setDepth(303);
+    const zone = this.add
+      .zone(cx, cy, cw, ch)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(303);
     const parts = [g, glow, icon, name, label, desc, hint];
-    zone.on('pointerover', () => this.tweens.add({ targets: [...parts, zone], scaleX: 1.05, scaleY: 1.05, duration: 100 }));
-    zone.on('pointerout', () => this.tweens.add({ targets: [...parts, zone], scaleX: 1, scaleY: 1, duration: 100 }));
+    zone.on('pointerover', () =>
+      this.tweens.add({ targets: [...parts, zone], scaleX: 1.05, scaleY: 1.05, duration: 100 }),
+    );
+    zone.on('pointerout', () =>
+      this.tweens.add({ targets: [...parts, zone], scaleX: 1, scaleY: 1, duration: 100 }),
+    );
     zone.on('pointerdown', () => this.pickAutoAtkCard());
     els.push(zone);
   }
@@ -3348,30 +4464,69 @@ export class GameScene extends Phaser.Scene {
     const startX = 400 - totalW / 2 + cw / 2;
 
     picks.forEach((skill, i) => {
-      const cx = startX + i * (cw + gap), cy = 280, ch = 240;
+      const cx = startX + i * (cw + gap),
+        cy = 280,
+        ch = 240;
       const curLv = this.skillLevels[skill.id] ?? 0;
       const nextLv = curLv + 1;
       const nextMult = skillMult(skill.id, nextLv);
       const isNew = curLv === 0;
 
-      const allParts = this.drawCardUI(cx, cy, cw, ch, {
-        icon: skill.icon, name: skill.name, color: skill.color,
-        desc: skill.descFn(nextMult), rarity: 'normal',
-        rc: { border: skill.color, text: '#' + skill.color.toString(16).padStart(6, '0'), label: skill.category, bg: 0x111122 },
-        isNew, isSkill: true, curLv, legendaryDesc: null,
-        cdText: `CD: ${this.skillCdAt(skill.id, nextLv).toFixed(1)}s`,
-        synergyName: null,
-      }, els, i, picks.length);
+      const allParts = this.drawCardUI(
+        cx,
+        cy,
+        cw,
+        ch,
+        {
+          icon: skill.icon,
+          name: skill.name,
+          color: skill.color,
+          desc: skill.descFn(nextMult),
+          rarity: 'normal',
+          rc: {
+            border: skill.color,
+            text: '#' + skill.color.toString(16).padStart(6, '0'),
+            label: skill.category,
+            bg: 0x111122,
+          },
+          isNew,
+          isSkill: true,
+          curLv,
+          legendaryDesc: null,
+          cdText: `CD: ${this.skillCdAt(skill.id, nextLv).toFixed(1)}s`,
+          synergyName: null,
+        },
+        els,
+        i,
+        picks.length,
+      );
 
-      const zone = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true }).setDepth(303);
-      zone.on('pointerover', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1.05, scaleY: 1.05, duration: 100 }));
-      zone.on('pointerout', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }));
+      const zone = this.add
+        .zone(cx, cy, cw, ch)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(303);
+      zone.on('pointerover', () =>
+        this.tweens.add({
+          targets: [...allParts, zone],
+          scaleX: 1.05,
+          scaleY: 1.05,
+          duration: 100,
+        }),
+      );
+      zone.on('pointerout', () =>
+        this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }),
+      );
       zone.on('pointerdown', () => this.pickSkillCard(skill.id));
       els.push(zone);
     });
   }
 
-  private renderMixedCards(statPicks: CardDef[], statRarities: CardRarity[], skillPicks: SkillDef[], els: Phaser.GameObjects.GameObject[]) {
+  private renderMixedCards(
+    statPicks: CardDef[],
+    statRarities: CardRarity[],
+    skillPicks: SkillDef[],
+    els: Phaser.GameObjects.GameObject[],
+  ) {
     const all = statPicks.length + skillPicks.length;
     const cw = all <= 3 ? 180 : 150;
     const gap = 20;
@@ -3380,63 +4535,152 @@ export class GameScene extends Phaser.Scene {
     let idx = 0;
 
     statPicks.forEach((card, i) => {
-      const cx = startX + idx * (cw + gap), cy = 280, ch = 240;
+      const cx = startX + idx * (cw + gap),
+        cy = 280,
+        ch = 240;
       const rarity = statRarities[i];
       const rc = RARITY_COLORS[rarity];
       const curLv = this.cardLevels[card.id] ?? 0;
-      const perPick = rarity === 'legendary' ? card.legendValue : rarity === 'rare' ? card.rareValue : card.baseValue;
+      const perPick =
+        rarity === 'legendary'
+          ? card.legendValue
+          : rarity === 'rare'
+            ? card.rareValue
+            : card.baseValue;
       const isNew = curLv === 0;
 
-      const allParts = this.drawCardUI(cx, cy, cw, ch, {
-        icon: card.icon, name: card.name, color: card.color,
-        desc: card.descFn(perPick), rarity, rc, isNew, isSkill: false,
-        curLv, legendaryDesc: (rarity === 'legendary' && LEGENDARY_DESCS[card.id]) ? LEGENDARY_DESCS[card.id] : null,
-        cdText: null, synergyName: null,
-      }, els, idx, all);
+      const allParts = this.drawCardUI(
+        cx,
+        cy,
+        cw,
+        ch,
+        {
+          icon: card.icon,
+          name: card.name,
+          color: card.color,
+          desc: card.descFn(perPick),
+          rarity,
+          rc,
+          isNew,
+          isSkill: false,
+          curLv,
+          legendaryDesc:
+            rarity === 'legendary' && LEGENDARY_DESCS[card.id] ? LEGENDARY_DESCS[card.id] : null,
+          cdText: null,
+          synergyName: null,
+        },
+        els,
+        idx,
+        all,
+      );
 
-      const zone = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true }).setDepth(303);
-      zone.on('pointerover', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1.05, scaleY: 1.05, duration: 100 }));
-      zone.on('pointerout', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }));
+      const zone = this.add
+        .zone(cx, cy, cw, ch)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(303);
+      zone.on('pointerover', () =>
+        this.tweens.add({
+          targets: [...allParts, zone],
+          scaleX: 1.05,
+          scaleY: 1.05,
+          duration: 100,
+        }),
+      );
+      zone.on('pointerout', () =>
+        this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }),
+      );
       zone.on('pointerdown', () => this.pickStatCard(card.id, rarity));
       els.push(zone);
       idx++;
     });
 
-    skillPicks.forEach((skill) => {
-      const cx = startX + idx * (cw + gap), cy = 280, ch = 240;
+    skillPicks.forEach(skill => {
+      const cx = startX + idx * (cw + gap),
+        cy = 280,
+        ch = 240;
       const curLv = this.skillLevels[skill.id] ?? 0;
       const nextLv = curLv + 1;
       const nextMult = skillMult(skill.id, nextLv);
       const isNew = curLv === 0;
 
-      const allParts = this.drawCardUI(cx, cy, cw, ch, {
-        icon: skill.icon, name: skill.name, color: skill.color,
-        desc: skill.descFn(nextMult), rarity: 'normal',
-        rc: { border: skill.color, text: '#' + skill.color.toString(16).padStart(6, '0'), label: skill.category, bg: 0x111122 },
-        isNew, isSkill: true, curLv, legendaryDesc: null,
-        cdText: `CD: ${this.skillCdAt(skill.id, nextLv).toFixed(1)}s`,
-        synergyName: null,
-      }, els, idx, all);
+      const allParts = this.drawCardUI(
+        cx,
+        cy,
+        cw,
+        ch,
+        {
+          icon: skill.icon,
+          name: skill.name,
+          color: skill.color,
+          desc: skill.descFn(nextMult),
+          rarity: 'normal',
+          rc: {
+            border: skill.color,
+            text: '#' + skill.color.toString(16).padStart(6, '0'),
+            label: skill.category,
+            bg: 0x111122,
+          },
+          isNew,
+          isSkill: true,
+          curLv,
+          legendaryDesc: null,
+          cdText: `CD: ${this.skillCdAt(skill.id, nextLv).toFixed(1)}s`,
+          synergyName: null,
+        },
+        els,
+        idx,
+        all,
+      );
 
-      const zone = this.add.zone(cx, cy, cw, ch).setInteractive({ useHandCursor: true }).setDepth(303);
-      zone.on('pointerover', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1.05, scaleY: 1.05, duration: 100 }));
-      zone.on('pointerout', () => this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }));
+      const zone = this.add
+        .zone(cx, cy, cw, ch)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(303);
+      zone.on('pointerover', () =>
+        this.tweens.add({
+          targets: [...allParts, zone],
+          scaleX: 1.05,
+          scaleY: 1.05,
+          duration: 100,
+        }),
+      );
+      zone.on('pointerout', () =>
+        this.tweens.add({ targets: [...allParts, zone], scaleX: 1, scaleY: 1, duration: 100 }),
+      );
       zone.on('pointerdown', () => this.pickSkillCard(skill.id));
       els.push(zone);
       idx++;
     });
   }
 
-  private drawCardUI(cx: number, cy: number, cw: number, ch: number, opts: {
-    icon: string; name: string; color: number; desc: string;
-    rarity: CardRarity; rc: { border: number; text: string; label: string; bg: number };
-    isNew: boolean; isSkill: boolean; curLv: number;
-    legendaryDesc: string | null; cdText: string | null; synergyName: string | null;
-  }, els: Phaser.GameObjects.GameObject[], i: number, total: number): Phaser.GameObjects.GameObject[] {
+  private drawCardUI(
+    cx: number,
+    cy: number,
+    cw: number,
+    ch: number,
+    opts: {
+      icon: string;
+      name: string;
+      color: number;
+      desc: string;
+      rarity: CardRarity;
+      rc: { border: number; text: string; label: string; bg: number };
+      isNew: boolean;
+      isSkill: boolean;
+      curLv: number;
+      legendaryDesc: string | null;
+      cdText: string | null;
+      synergyName: string | null;
+    },
+    els: Phaser.GameObjects.GameObject[],
+    i: number,
+    total: number,
+  ): Phaser.GameObjects.GameObject[] {
     const { rarity, rc } = opts;
 
     const g = this.add.graphics().setDepth(301);
-    g.fillStyle(rc.bg, 0.95); g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 14);
+    g.fillStyle(rc.bg, 0.95);
+    g.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 14);
     const borderW = rarity === 'legendary' ? 4 : 3;
     g.lineStyle(borderW, rc.border, rarity === 'normal' ? 0.6 : 1);
     g.strokeRoundedRect(cx - cw / 2, cy - ch / 2, cw, ch, 14);
@@ -3453,73 +4697,164 @@ export class GameScene extends Phaser.Scene {
     topBar.fillStyle(opts.color, 0.3);
     topBar.fillRoundedRect(cx - cw / 2, cy - ch / 2, cw, 50, { tl: 14, tr: 14, bl: 0, br: 0 });
 
-    const rarityLabel = this.add.text(cx - cw / 2 + 8, cy - ch / 2 + 6, rc.label, {
-      fontSize: '9px', color: rc.text, fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setDepth(303);
+    const rarityLabel = this.add
+      .text(cx - cw / 2 + 8, cy - ch / 2 + 6, rc.label, {
+        fontSize: '9px',
+        color: rc.text,
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setDepth(303);
 
     const iconSize = total <= 3 ? '36px' : '28px';
     const nameSize = total <= 3 ? '16px' : '13px';
-    const icon = this.add.text(cx, cy - 90, opts.icon, { fontSize: iconSize }).setOrigin(0.5).setDepth(302);
-    const name = this.add.text(cx, cy - 50, opts.name, {
-      fontSize: nameSize, color: '#ffffff', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(302);
+    const icon = this.add
+      .text(cx, cy - 90, opts.icon, { fontSize: iconSize })
+      .setOrigin(0.5)
+      .setDepth(302);
+    const name = this.add
+      .text(cx, cy - 50, opts.name, {
+        fontSize: nameSize,
+        color: '#ffffff',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(302);
 
     if (opts.isSkill) {
-      els.push(this.add.text(cx + cw / 2 - 8, cy - ch / 2 + 8, 'SKILL', {
-        fontSize: '9px', color: '#ffffff', fontFamily: 'Arial', fontStyle: 'bold',
-        backgroundColor: '#ff4400', padding: { x: 3, y: 1 },
-      }).setOrigin(1, 0).setDepth(303));
+      els.push(
+        this.add
+          .text(cx + cw / 2 - 8, cy - ch / 2 + 8, 'SKILL', {
+            fontSize: '9px',
+            color: '#ffffff',
+            fontFamily: 'Arial',
+            fontStyle: 'bold',
+            backgroundColor: '#ff4400',
+            padding: { x: 3, y: 1 },
+          })
+          .setOrigin(1, 0)
+          .setDepth(303),
+      );
     }
 
-    const desc = this.add.text(cx, cy - 5, opts.desc, {
-      fontSize: '12px', color: '#aaddff', fontFamily: 'Arial', stroke: '#000000', strokeThickness: 2,
-      wordWrap: { width: cw - 16 }, align: 'center',
-    }).setOrigin(0.5).setDepth(302);
+    const desc = this.add
+      .text(cx, cy - 5, opts.desc, {
+        fontSize: '12px',
+        color: '#aaddff',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 2,
+        wordWrap: { width: cw - 16 },
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setDepth(302);
 
     let legendaryDescT: Phaser.GameObjects.Text | null = null;
     if (opts.legendaryDesc) {
-      legendaryDescT = this.add.text(cx, cy + 12, `★ ${opts.legendaryDesc}`, {
-        fontSize: '9px', color: '#ffd700', fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 2, wordWrap: { width: cw - 16 }, align: 'center',
-      }).setOrigin(0.5).setDepth(302);
+      legendaryDescT = this.add
+        .text(cx, cy + 12, `★ ${opts.legendaryDesc}`, {
+          fontSize: '9px',
+          color: '#ffd700',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+          wordWrap: { width: cw - 16 },
+          align: 'center',
+        })
+        .setOrigin(0.5)
+        .setDepth(302);
     }
 
     let cdLine: Phaser.GameObjects.Text | null = null;
     if (opts.cdText) {
       const cdY = legendaryDescT ? cy + 30 : cy + 14;
-      cdLine = this.add.text(cx, cdY, opts.cdText, {
-        fontSize: '11px', color: '#99bbdd', fontFamily: 'Arial', stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0.5).setDepth(302);
+      cdLine = this.add
+        .text(cx, cdY, opts.cdText, {
+          fontSize: '11px',
+          color: '#99bbdd',
+          fontFamily: 'Arial',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+        .setDepth(302);
     }
 
     const badgeY = cdLine ? cy + 46 : legendaryDescT ? cy + 40 : opts.isSkill ? cy + 35 : cy + 28;
-    const bdg = this.add.text(cx, badgeY,
-      opts.isNew ? (opts.isSkill ? '✦ 스킬 획득' : '✦ NEW') : `강화 Lv.${opts.curLv + 1}`, {
-      fontSize: '13px', color: opts.isNew ? '#44ff44' : '#ffaa44', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(302);
+    const bdg = this.add
+      .text(
+        cx,
+        badgeY,
+        opts.isNew ? (opts.isSkill ? '✦ 스킬 획득' : '✦ NEW') : `강화 Lv.${opts.curLv + 1}`,
+        {
+          fontSize: '13px',
+          color: opts.isNew ? '#44ff44' : '#ffaa44',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(302);
 
-    const starsT = this.add.text(cx, badgeY + 18,
-      opts.isNew ? '' : '★'.repeat(opts.curLv) + '☆'.repeat(4 - opts.curLv), {
-      fontSize: '14px', color: '#ffcc00', fontFamily: 'Arial',
-    }).setOrigin(0.5).setDepth(302);
+    const starsT = this.add
+      .text(
+        cx,
+        badgeY + 18,
+        opts.isNew ? '' : '★'.repeat(opts.curLv) + '☆'.repeat(4 - opts.curLv),
+        {
+          fontSize: '14px',
+          color: '#ffcc00',
+          fontFamily: 'Arial',
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(302);
 
     let synergyHint: Phaser.GameObjects.Text | null = null;
     if (opts.synergyName) {
-      synergyHint = this.add.text(cx, cy + ch / 2 - 28, `🔗 ${opts.synergyName}`, {
-        fontSize: '10px', color: '#44ffaa', fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0.5).setDepth(303);
+      synergyHint = this.add
+        .text(cx, cy + ch / 2 - 28, `🔗 ${opts.synergyName}`, {
+          fontSize: '10px',
+          color: '#44ffaa',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+        .setDepth(303);
       this.tweens.add({ targets: synergyHint, alpha: 0.4, duration: 500, yoyo: true, repeat: -1 });
     }
 
-    const hintT = this.add.text(cx, cy + ch / 2 - 14, '클릭하여 선택', {
-      fontSize: '10px', color: '#555577', fontFamily: 'Arial',
-    }).setOrigin(0.5).setDepth(302);
+    const hintT = this.add
+      .text(cx, cy + ch / 2 - 14, '클릭하여 선택', {
+        fontSize: '10px',
+        color: '#555577',
+        fontFamily: 'Arial',
+      })
+      .setOrigin(0.5)
+      .setDepth(302);
 
-    const allParts: Phaser.GameObjects.GameObject[] = [g, topBar, rarityLabel, icon, name, desc, bdg, starsT, hintT];
+    const allParts: Phaser.GameObjects.GameObject[] = [
+      g,
+      topBar,
+      rarityLabel,
+      icon,
+      name,
+      desc,
+      bdg,
+      starsT,
+      hintT,
+    ];
     if (cdLine) allParts.push(cdLine);
     if (legendaryDescT) allParts.push(legendaryDescT);
     if (synergyHint) allParts.push(synergyHint);
@@ -3530,9 +4865,17 @@ export class GameScene extends Phaser.Scene {
     if (cdLine) textEls.push(cdLine);
     if (legendaryDescT) textEls.push(legendaryDescT);
     if (synergyHint) textEls.push(synergyHint);
-    textEls.forEach(t => { t.y += 30; });
+    textEls.forEach(t => {
+      t.y += 30;
+    });
     this.tweens.add({ targets: allParts, alpha: 1, duration: 280, delay: 350 + i * 120 });
-    this.tweens.add({ targets: textEls, y: '-=30', duration: 350, delay: 350 + i * 120, ease: 'Back.easeOut' });
+    this.tweens.add({
+      targets: textEls,
+      y: '-=30',
+      duration: 350,
+      delay: 350 + i * 120,
+      ease: 'Back.easeOut',
+    });
 
     if (rarity === 'legendary') {
       this.time.delayedCall(350 + i * 120, () => {
@@ -3550,8 +4893,12 @@ export class GameScene extends Phaser.Scene {
     this.cardLevels[id] = (this.cardLevels[id] ?? 0) + 1;
     const newLv = this.cardLevels[id];
 
-    const rarityExtra = rarity === 'legendary' ? (card.legendValue - card.baseValue)
-                       : rarity === 'rare' ? (card.rareValue - card.baseValue) : 0;
+    const rarityExtra =
+      rarity === 'legendary'
+        ? card.legendValue - card.baseValue
+        : rarity === 'rare'
+          ? card.rareValue - card.baseValue
+          : 0;
     if (rarityExtra > 0) {
       this.cardRarityBonus[id] = (this.cardRarityBonus[id] ?? 0) + rarityExtra;
     }
@@ -3588,7 +4935,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private finishCardPick() {
-    this.drawPlayerHpBar(); this.updateUI();
+    this.drawPlayerHpBar();
+    this.updateUI();
     this.cameras.main.flash(200, 255, 255, 100);
     this.closeOverlay();
     this.checkSynergies();
@@ -3684,18 +5032,43 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showBasicAtkTutorial(show: boolean, onDone?: () => void) {
-    if (!show) { onDone?.(); return; }
+    if (!show) {
+      onDone?.();
+      return;
+    }
     const bg = this.add.graphics().setDepth(400);
     bg.fillStyle(0x000000, 0.7);
     bg.fillRoundedRect(150, 230, 500, 50, 10);
     bg.lineStyle(1, 0x66ccff, 0.6);
     bg.strokeRoundedRect(150, 230, 500, 50, 10);
-    const txt = this.add.text(400, 245, '[Q]키 또는 스킬 슬롯 클릭으로 기본 공격!\n레벨업 후 자동공격 카드를 획득하면 자동으로 공격합니다.', {
-      fontSize: '11px', color: '#88ccff', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3, align: 'center',
-    }).setOrigin(0.5, 0).setDepth(401);
+    const txt = this.add
+      .text(
+        400,
+        245,
+        '[Q]키 또는 스킬 슬롯 클릭으로 기본 공격!\n레벨업 후 자동공격 카드를 획득하면 자동으로 공격합니다.',
+        {
+          fontSize: '11px',
+          color: '#88ccff',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 3,
+          align: 'center',
+        },
+      )
+      .setOrigin(0.5, 0)
+      .setDepth(401);
     this.time.delayedCall(3000, () => {
-      this.tweens.add({ targets: [bg, txt], alpha: 0, duration: 500, onComplete: () => { bg.destroy(); txt.destroy(); onDone?.(); } });
+      this.tweens.add({
+        targets: [bg, txt],
+        alpha: 0,
+        duration: 500,
+        onComplete: () => {
+          bg.destroy();
+          txt.destroy();
+          onDone?.();
+        },
+      });
     });
   }
 
@@ -3705,12 +5078,28 @@ export class GameScene extends Phaser.Scene {
     bg.fillRoundedRect(150, 360, 500, 60, 10);
     bg.lineStyle(1, 0xffcc44, 0.6);
     bg.strokeRoundedRect(150, 360, 500, 60, 10);
-    const txt = this.add.text(400, 380, '몬스터의 원형 게이지가 초록색이 될 때\nSPACE / 우클릭으로 패링!', {
-      fontSize: '13px', color: '#ffdd88', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3, align: 'center',
-    }).setOrigin(0.5, 0).setDepth(401);
+    const txt = this.add
+      .text(400, 380, '몬스터의 원형 게이지가 초록색이 될 때\nSPACE / 우클릭으로 패링!', {
+        fontSize: '13px',
+        color: '#ffdd88',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+        align: 'center',
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(401);
     this.time.delayedCall(5000, () => {
-      this.tweens.add({ targets: [bg, txt], alpha: 0, duration: 500, onComplete: () => { bg.destroy(); txt.destroy(); } });
+      this.tweens.add({
+        targets: [bg, txt],
+        alpha: 0,
+        duration: 500,
+        onComplete: () => {
+          bg.destroy();
+          txt.destroy();
+        },
+      });
     });
   }
 
@@ -3762,25 +5151,53 @@ export class GameScene extends Phaser.Scene {
     const els = this.overlayElements;
 
     const bg = this.add.graphics().setDepth(280).setAlpha(0);
-    bg.fillStyle(0x000000, 0.7); bg.fillRect(0, 0, 800, 600);
-    els.push(bg); this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
+    bg.fillStyle(0x000000, 0.7);
+    bg.fillRect(0, 0, 800, 600);
+    els.push(bg);
+    this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
 
-    els.push(this.add.text(400, 80, '경로를 선택하세요', {
-      fontSize: '32px', color: '#ddbb66', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 5,
-    }).setOrigin(0.5).setDepth(281));
+    els.push(
+      this.add
+        .text(400, 80, '경로를 선택하세요', {
+          fontSize: '32px',
+          color: '#ddbb66',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 5,
+        })
+        .setOrigin(0.5)
+        .setDepth(281),
+    );
 
-    els.push(this.add.text(400, 115, `${this.regionDef.icon} ${this.regionDef.name} - Stage ${this.localStage}/20`, {
-      fontSize: '14px', color: '#888899', fontFamily: 'Arial', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(281));
+    els.push(
+      this.add
+        .text(
+          400,
+          115,
+          `${this.regionDef.icon} ${this.regionDef.name} - Stage ${this.localStage}/20`,
+          {
+            fontSize: '14px',
+            color: '#888899',
+            fontFamily: 'Arial',
+            stroke: '#000000',
+            strokeThickness: 2,
+          },
+        )
+        .setOrigin(0.5)
+        .setDepth(281),
+    );
 
     const doors = this.generateDoors();
-    const doorW = 200, doorH = 240, gap = 30;
+    const doorW = 200,
+      doorH = 240,
+      gap = 30;
     const totalW = doors.length * doorW + (doors.length - 1) * gap;
     const startX = 400 - totalW / 2 + doorW / 2;
 
     doors.forEach((door, i) => {
-      const dx = startX + i * (doorW + gap), dy = 275;
+      const dx = startX + i * (doorW + gap),
+        dy = 275;
 
       const card = this.add.graphics().setDepth(281);
       const drawCard = (hover: boolean) => {
@@ -3791,36 +5208,95 @@ export class GameScene extends Phaser.Scene {
         card.strokeRoundedRect(dx - doorW / 2, dy - doorH / 2, doorW, doorH, 14);
         const tg = hover ? 0.5 : 0.3;
         card.fillStyle(door.color, tg);
-        card.fillRoundedRect(dx - doorW / 2, dy - doorH / 2, doorW, 60, { tl: 14, tr: 14, bl: 0, br: 0 });
+        card.fillRoundedRect(dx - doorW / 2, dy - doorH / 2, doorW, 60, {
+          tl: 14,
+          tr: 14,
+          bl: 0,
+          br: 0,
+        });
       };
       drawCard(false);
       els.push(card);
 
-      els.push(this.add.text(dx, dy - 90, door.icon, { fontSize: '48px' }).setOrigin(0.5).setDepth(282));
-      els.push(this.add.text(dx, dy - 30, door.name, {
-        fontSize: '22px', color: '#ffffff', fontFamily: 'Arial, sans-serif', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(282));
-      els.push(this.add.text(dx, dy + 10, door.desc, {
-        fontSize: '12px', color: '#aabbcc', fontFamily: 'Arial',
-        stroke: '#000000', strokeThickness: 2, wordWrap: { width: doorW - 20 }, align: 'center',
-      }).setOrigin(0.5).setDepth(282));
+      els.push(
+        this.add
+          .text(dx, dy - 90, door.icon, { fontSize: '48px' })
+          .setOrigin(0.5)
+          .setDepth(282),
+      );
+      els.push(
+        this.add
+          .text(dx, dy - 30, door.name, {
+            fontSize: '22px',
+            color: '#ffffff',
+            fontFamily: 'Arial, sans-serif',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 3,
+          })
+          .setOrigin(0.5)
+          .setDepth(282),
+      );
+      els.push(
+        this.add
+          .text(dx, dy + 10, door.desc, {
+            fontSize: '12px',
+            color: '#aabbcc',
+            fontFamily: 'Arial',
+            stroke: '#000000',
+            strokeThickness: 2,
+            wordWrap: { width: doorW - 20 },
+            align: 'center',
+          })
+          .setOrigin(0.5)
+          .setDepth(282),
+      );
 
       if (door.type === 'elite') {
-        els.push(this.add.text(dx, dy + 50, '⚠ 위험!', {
-          fontSize: '14px', color: '#ff6644', fontFamily: 'Arial', fontStyle: 'bold', stroke: '#000000', strokeThickness: 2,
-        }).setOrigin(0.5).setDepth(282));
+        els.push(
+          this.add
+            .text(dx, dy + 50, '⚠ 위험!', {
+              fontSize: '14px',
+              color: '#ff6644',
+              fontFamily: 'Arial',
+              fontStyle: 'bold',
+              stroke: '#000000',
+              strokeThickness: 2,
+            })
+            .setOrigin(0.5)
+            .setDepth(282),
+        );
       } else if (door.type === 'rest') {
-        els.push(this.add.text(dx, dy + 50, '♥ 안전', {
-          fontSize: '14px', color: '#44ff88', fontFamily: 'Arial', fontStyle: 'bold', stroke: '#000000', strokeThickness: 2,
-        }).setOrigin(0.5).setDepth(282));
+        els.push(
+          this.add
+            .text(dx, dy + 50, '♥ 안전', {
+              fontSize: '14px',
+              color: '#44ff88',
+              fontFamily: 'Arial',
+              fontStyle: 'bold',
+              stroke: '#000000',
+              strokeThickness: 2,
+            })
+            .setOrigin(0.5)
+            .setDepth(282),
+        );
       }
 
-      els.push(this.add.text(dx, dy + doorH / 2 - 30, '클릭하여 선택', {
-        fontSize: '11px', color: '#555577', fontFamily: 'Arial',
-      }).setOrigin(0.5).setDepth(282));
+      els.push(
+        this.add
+          .text(dx, dy + doorH / 2 - 30, '클릭하여 선택', {
+            fontSize: '11px',
+            color: '#555577',
+            fontFamily: 'Arial',
+          })
+          .setOrigin(0.5)
+          .setDepth(282),
+      );
 
-      const z = this.add.zone(dx, dy, doorW, doorH).setInteractive({ useHandCursor: true }).setDepth(283);
+      const z = this.add
+        .zone(dx, dy, doorW, doorH)
+        .setInteractive({ useHandCursor: true })
+        .setDepth(283);
       z.on('pointerover', () => drawCard(true));
       z.on('pointerout', () => drawCard(false));
       z.on('pointerdown', () => this.selectDoor(door.type));
@@ -3873,29 +5349,61 @@ export class GameScene extends Phaser.Scene {
     this.restCardPending = true;
     const els = this.overlayElements;
     const bg = this.add.graphics().setDepth(280).setAlpha(0);
-    bg.fillStyle(0x000000, 0.7); bg.fillRect(0, 0, 800, 600);
-    els.push(bg); this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
+    bg.fillStyle(0x000000, 0.7);
+    bg.fillRect(0, 0, 800, 600);
+    els.push(bg);
+    this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
 
-    els.push(this.add.text(400, 150, '🔥 휴식', {
-      fontSize: '36px', color: '#ffaa44', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 5,
-    }).setOrigin(0.5).setDepth(281));
+    els.push(
+      this.add
+        .text(400, 150, '🔥 휴식', {
+          fontSize: '36px',
+          color: '#ffaa44',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 5,
+        })
+        .setOrigin(0.5)
+        .setDepth(281),
+    );
 
     const heal = Math.ceil(this.playerMaxHp * 0.3);
     this.playerHp = Math.min(this.playerHp + heal, this.playerMaxHp);
     this.drawPlayerHpBar();
 
-    els.push(this.add.text(400, 210, `HP ${heal} 회복!`, {
-      fontSize: '22px', color: '#44ff88', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(281));
+    els.push(
+      this.add
+        .text(400, 210, `HP ${heal} 회복!`, {
+          fontSize: '22px',
+          color: '#44ff88',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(281),
+    );
 
-    els.push(this.add.text(400, 260, '카드를 강화하세요', {
-      fontSize: '16px', color: '#aabbcc', fontFamily: 'Arial', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(281));
+    els.push(
+      this.add
+        .text(400, 260, '카드를 강화하세요', {
+          fontSize: '16px',
+          color: '#aabbcc',
+          fontFamily: 'Arial',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+        .setDepth(281),
+    );
 
     const btnG = this.add.graphics().setDepth(281);
-    const bx = 400, by = 500, bw = 200, bh = 48;
+    const bx = 400,
+      by = 500,
+      bw = 200,
+      bh = 48;
     const drawBtn = (hover: boolean) => {
       btnG.clear();
       btnG.fillStyle(hover ? 0x446644 : 0x334433, 1);
@@ -3903,10 +5411,19 @@ export class GameScene extends Phaser.Scene {
       btnG.lineStyle(2, hover ? 0x66cc88 : 0x44aa66, 1);
       btnG.strokeRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 12);
     };
-    drawBtn(false); els.push(btnG);
-    els.push(this.add.text(bx, by, '계속하기', {
-      fontSize: '18px', color: '#ffffff', fontFamily: 'Arial', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(282));
+    drawBtn(false);
+    els.push(btnG);
+    els.push(
+      this.add
+        .text(bx, by, '계속하기', {
+          fontSize: '18px',
+          color: '#ffffff',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setDepth(282),
+    );
     const z = this.add.zone(bx, by, bw, bh).setInteractive({ useHandCursor: true }).setDepth(283);
     z.on('pointerover', () => drawBtn(true));
     z.on('pointerout', () => drawBtn(false));
@@ -3924,27 +5441,59 @@ export class GameScene extends Phaser.Scene {
     const els = this.overlayElements;
 
     const bg = this.add.graphics().setDepth(280).setAlpha(0);
-    bg.fillStyle(0x000000, 0.7); bg.fillRect(0, 0, 800, 600);
-    els.push(bg); this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
+    bg.fillStyle(0x000000, 0.7);
+    bg.fillRect(0, 0, 800, 600);
+    els.push(bg);
+    this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
 
     els.push(this.add.text(400, 130, evt.icon, { fontSize: '60px' }).setOrigin(0.5).setDepth(281));
-    els.push(this.add.text(400, 190, evt.name, {
-      fontSize: '28px', color: '#ddbb66', fontFamily: 'Arial, sans-serif', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(281));
-    els.push(this.add.text(400, 230, evt.desc, {
-      fontSize: '16px', color: '#aabbcc', fontFamily: 'Arial', stroke: '#000000', strokeThickness: 2,
-    }).setOrigin(0.5).setDepth(281));
+    els.push(
+      this.add
+        .text(400, 190, evt.name, {
+          fontSize: '28px',
+          color: '#ddbb66',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5)
+        .setDepth(281),
+    );
+    els.push(
+      this.add
+        .text(400, 230, evt.desc, {
+          fontSize: '16px',
+          color: '#aabbcc',
+          fontFamily: 'Arial',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+        .setDepth(281),
+    );
 
     this.applyEvent(evt);
 
-    els.push(this.add.text(400, 300, evt.effect, {
-      fontSize: '20px', color: '#ff8844', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(281));
+    els.push(
+      this.add
+        .text(400, 300, evt.effect, {
+          fontSize: '20px',
+          color: '#ff8844',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(281),
+    );
 
     const btnG = this.add.graphics().setDepth(281);
-    const bx = 400, by = 420, bw = 200, bh = 48;
+    const bx = 400,
+      by = 420,
+      bw = 200,
+      bh = 48;
     const drawBtn = (hover: boolean) => {
       btnG.clear();
       btnG.fillStyle(hover ? 0x444466 : 0x333344, 1);
@@ -3952,14 +5501,26 @@ export class GameScene extends Phaser.Scene {
       btnG.lineStyle(2, hover ? 0x8888aa : 0x666688, 1);
       btnG.strokeRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 12);
     };
-    drawBtn(false); els.push(btnG);
-    els.push(this.add.text(bx, by, '계속하기', {
-      fontSize: '18px', color: '#ffffff', fontFamily: 'Arial', fontStyle: 'bold',
-    }).setOrigin(0.5).setDepth(282));
+    drawBtn(false);
+    els.push(btnG);
+    els.push(
+      this.add
+        .text(bx, by, '계속하기', {
+          fontSize: '18px',
+          color: '#ffffff',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setDepth(282),
+    );
     const z = this.add.zone(bx, by, bw, bh).setInteractive({ useHandCursor: true }).setDepth(283);
     z.on('pointerover', () => drawBtn(true));
     z.on('pointerout', () => drawBtn(false));
-    z.on('pointerdown', () => { this.closeOverlay(); this.advanceToNextStage(); });
+    z.on('pointerdown', () => {
+      this.closeOverlay();
+      this.advanceToNextStage();
+    });
     els.push(z);
   }
 
@@ -4037,15 +5598,20 @@ export class GameScene extends Phaser.Scene {
       const bossSize = isRegionBoss ? 90 : 80;
 
       const boss = new Monster(this, MAIN_MON_POS.x, MAIN_MON_POS.y, {
-        name: bossName, hp: baseHp * hpMult, gold: goldDrop * goldMult,
-        type: bossType, size: Math.floor(bossSize * 1.5),
-        level: this.stage, nameColor,
+        name: bossName,
+        hp: baseHp * hpMult,
+        gold: goldDrop * goldMult,
+        type: bossType,
+        size: Math.floor(bossSize * 1.5),
+        level: this.stage,
+        nameColor,
       });
       this.monsters.push(boss);
 
       this.bossRageLevel = 0;
       this.bossRageTimer = this.time.addEvent({
-        delay: isRegionBoss ? 15000 : 20000, loop: true,
+        delay: isRegionBoss ? 15000 : 20000,
+        loop: true,
         callback: () => this.advanceBossRage(isRegionBoss),
       });
       this.startBossPatterns();
@@ -4056,12 +5622,16 @@ export class GameScene extends Phaser.Scene {
       const data = pool[(ls - 1) % pool.length];
 
       const specialType = this.rollSpecialType();
-      const goldMod = specialType === 'shield' ? 1.5 : (specialType === 'split' ? 1.5 : 1);
+      const goldMod = specialType === 'shield' ? 1.5 : specialType === 'split' ? 1.5 : 1;
 
       const main = new Monster(this, MAIN_MON_POS.x, MAIN_MON_POS.y, {
-        name: data.name, hp: baseHp, gold: Math.floor(goldDrop * goldMod),
-        type: data.type, size: data.size,
-        level: this.stage, specialType,
+        name: data.name,
+        hp: baseHp,
+        gold: Math.floor(goldDrop * goldMod),
+        type: data.type,
+        size: data.size,
+        level: this.stage,
+        specialType,
       });
       this.monsters.push(main);
 
@@ -4077,10 +5647,13 @@ export class GameScene extends Phaser.Scene {
       for (let i = 0; i < subCount; i++) {
         const pos = SUB_MON_POSITIONS[i];
         const sub = new Monster(this, pos.x, pos.y, {
-          name: subData.name, hp: Math.floor(baseHp * 0.3),
+          name: subData.name,
+          hp: Math.floor(baseHp * 0.3),
           gold: Math.floor(goldDrop * 0.2),
-          type: subData.type, size: Math.floor(subData.size * 0.65),
-          level: this.stage, isSub: true,
+          type: subData.type,
+          size: Math.floor(subData.size * 0.65),
+          level: this.stage,
+          isSub: true,
         });
         this.monsters.push(sub);
       }
@@ -4141,7 +5714,9 @@ export class GameScene extends Phaser.Scene {
       interval = Math.max(1500, MON_ATK_INTERVAL_NORMAL - (aliveCount - 1) * 350);
     }
     this.monsterAttackTimer = this.time.addEvent({
-      delay: interval, loop: true, callback: () => this.startMonsterAttackSequence(),
+      delay: interval,
+      loop: true,
+      callback: () => this.startMonsterAttackSequence(),
     });
   }
 
@@ -4149,11 +5724,11 @@ export class GameScene extends Phaser.Scene {
 
   private rollSpecialType(): SpecialType {
     const ls = this.localStage;
-    const bonus = ls >= 11 ? 0.10 : 0;
+    const bonus = ls >= 11 ? 0.1 : 0;
     const pool: { type: SpecialType; chance: number }[] = [];
-    if (ls >= 5) pool.push({ type: 'shield', chance: 0.30 + bonus });
+    if (ls >= 5) pool.push({ type: 'shield', chance: 0.3 + bonus });
     if (ls >= 6) pool.push({ type: 'charge', chance: 0.25 + bonus });
-    if (ls >= 8) pool.push({ type: 'split', chance: 0.20 + bonus });
+    if (ls >= 8) pool.push({ type: 'split', chance: 0.2 + bonus });
     if (pool.length === 0) return 'none';
     for (const entry of pool) {
       if (Math.random() < entry.chance) return entry.type;
@@ -4170,18 +5745,37 @@ export class GameScene extends Phaser.Scene {
     };
     const text = labels[type];
     if (!text) return;
-    const tip = this.add.text(400, 140, text, {
-      fontSize: '14px', color: '#ffdd88', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(100).setAlpha(0);
-    this.tweens.add({ targets: tip, alpha: 1, duration: 300, hold: 2000, yoyo: true, onComplete: () => tip.destroy() });
+    const tip = this.add
+      .text(400, 140, text, {
+        fontSize: '14px',
+        color: '#ffdd88',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(100)
+      .setAlpha(0);
+    this.tweens.add({
+      targets: tip,
+      alpha: 1,
+      duration: 300,
+      hold: 2000,
+      yoyo: true,
+      onComplete: () => tip.destroy(),
+    });
   }
 
   private startChargeTimer(monster: Monster) {
     const timer = this.time.addEvent({
-      delay: 3000, loop: true,
+      delay: 3000,
+      loop: true,
       callback: () => {
-        if (this.gameOver || monster.isDead) { timer.remove(); return; }
+        if (this.gameOver || monster.isDead) {
+          timer.remove();
+          return;
+        }
         monster.charging = true;
         DamageText.show(this, monster.x, monster.y - 60, '⚡ 돌진 준비!', '#ff4444', '20px');
         this.time.delayedCall(1500, () => {
@@ -4191,7 +5785,9 @@ export class GameScene extends Phaser.Scene {
             DamageText.show(this, 400, 180, '방어 성공!', '#88ccff', '20px');
             return;
           }
-          const baseAtk = Math.floor(MON_BASE_ATK * Math.pow(MON_ATK_GROWTH, this.stage - 1) * this.regionDef.atkMult);
+          const baseAtk = Math.floor(
+            MON_BASE_ATK * Math.pow(MON_ATK_GROWTH, this.stage - 1) * this.regionDef.atkMult,
+          );
           const chargeDmg = Math.floor(baseAtk * 3 * (1 - this.defenseRate));
           if (this.invincible) return;
           this.playerHp = Math.max(0, this.playerHp - chargeDmg);
@@ -4211,16 +5807,28 @@ export class GameScene extends Phaser.Scene {
     DamageText.show(this, original.x, original.y - 50, '💥 분열!', '#ffaa44', '24px');
     this.emitParticles(original.x, original.y, [0xffaa00, 0xff6600, 0xffffff], 8);
 
-    const baseHp = Math.floor(MON_BASE_HP * Math.pow(MON_HP_GROWTH, this.stage - 1) * this.regionDef.hpMult * 0.5);
-    const baseGold = Math.floor(this.stage * 4 * this.goldDropMultiplier * this.regionDef.goldMult * 0.3);
+    const baseHp = Math.floor(
+      MON_BASE_HP * Math.pow(MON_HP_GROWTH, this.stage - 1) * this.regionDef.hpMult * 0.5,
+    );
+    const baseGold = Math.floor(
+      this.stage * 4 * this.goldDropMultiplier * this.regionDef.goldMult * 0.3,
+    );
 
     for (let i = 0; i < 2; i++) {
-      const pos = SUB_MON_POSITIONS[i] ?? { x: original.x + (i === 0 ? -80 : 80), y: original.y + 50 };
+      const pos = SUB_MON_POSITIONS[i] ?? {
+        x: original.x + (i === 0 ? -80 : 80),
+        y: original.y + 50,
+      };
       const baby = new Monster(this, pos.x, pos.y, {
-        name: original.monsterName, hp: baseHp, gold: baseGold,
-        type: original.monsterType, size: Math.floor(original.isSub ? 30 : 40),
-        level: original.monsterLevel, isSub: true,
-        specialType: 'none', canSplit: false,
+        name: original.monsterName,
+        hp: baseHp,
+        gold: baseGold,
+        type: original.monsterType,
+        size: Math.floor(original.isSub ? 30 : 40),
+        level: original.monsterLevel,
+        isSub: true,
+        specialType: 'none',
+        canSplit: false,
       });
       this.monsters.push(baby);
       baby.on('pointerdown', () => {
@@ -4240,7 +5848,8 @@ export class GameScene extends Phaser.Scene {
     const r = this.regionDef;
 
     const blackout = this.add.graphics().setDepth(200).setAlpha(0);
-    blackout.fillStyle(0x000000, 1); blackout.fillRect(0, 0, 800, 600);
+    blackout.fillStyle(0x000000, 1);
+    blackout.fillRect(0, 0, 800, 600);
     this.tweens.add({ targets: blackout, alpha: 1, duration: 200 });
 
     this.time.delayedCall(500, () => {
@@ -4249,33 +5858,78 @@ export class GameScene extends Phaser.Scene {
       warningBg.fillRect(0, 0, 800, 600);
       blackout.destroy();
 
-      const warnText = this.add.text(400, 240, '⚠ WARNING ⚠', {
-        fontSize: '56px', color: '#ff3333', fontFamily: 'Arial, sans-serif',
-        fontStyle: 'bold', stroke: '#000000', strokeThickness: 8,
-      }).setOrigin(0.5).setDepth(201).setAlpha(0).setScale(1.5);
-      this.tweens.add({ targets: warnText, alpha: 1, scale: 1, duration: 250, ease: 'Back.easeOut' });
-      this.tweens.add({ targets: warnText, alpha: 0.2, duration: 200, yoyo: true, repeat: 4, delay: 300 });
+      const warnText = this.add
+        .text(400, 240, '⚠ WARNING ⚠', {
+          fontSize: '56px',
+          color: '#ff3333',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 8,
+        })
+        .setOrigin(0.5)
+        .setDepth(201)
+        .setAlpha(0)
+        .setScale(1.5);
+      this.tweens.add({
+        targets: warnText,
+        alpha: 1,
+        scale: 1,
+        duration: 250,
+        ease: 'Back.easeOut',
+      });
+      this.tweens.add({
+        targets: warnText,
+        alpha: 0.2,
+        duration: 200,
+        yoyo: true,
+        repeat: 4,
+        delay: 300,
+      });
 
       const bossLabel = isFinal ? `${r.bossName} 등장!` : `${r.miniBossName} 등장!`;
-      const nameText = this.add.text(400, 320, bossLabel, {
-        fontSize: '36px', color: isFinal ? '#ffd700' : '#ff8844', fontFamily: 'Arial, sans-serif',
-        fontStyle: 'bold', stroke: '#000000', strokeThickness: 6,
-      }).setOrigin(0.5).setDepth(201).setAlpha(0).setScale(0.5);
-      this.tweens.add({ targets: nameText, alpha: 1, scale: 1, duration: 400, delay: 400, ease: 'Back.easeOut' });
+      const nameText = this.add
+        .text(400, 320, bossLabel, {
+          fontSize: '36px',
+          color: isFinal ? '#ffd700' : '#ff8844',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 6,
+        })
+        .setOrigin(0.5)
+        .setDepth(201)
+        .setAlpha(0)
+        .setScale(0.5);
+      this.tweens.add({
+        targets: nameText,
+        alpha: 1,
+        scale: 1,
+        duration: 400,
+        delay: 400,
+        ease: 'Back.easeOut',
+      });
 
       this.cameras.main.shake(1000, 0.015);
 
       const edgeFlash = this.add.graphics().setDepth(199);
       const ec = isFinal ? 0xff0000 : 0xff8800;
-      edgeFlash.lineStyle(8, ec, 0.8); edgeFlash.strokeRect(0, 0, 800, 600);
-      edgeFlash.lineStyle(3, ec, 0.4); edgeFlash.strokeRect(6, 6, 788, 588);
+      edgeFlash.lineStyle(8, ec, 0.8);
+      edgeFlash.strokeRect(0, 0, 800, 600);
+      edgeFlash.lineStyle(3, ec, 0.4);
+      edgeFlash.strokeRect(6, 6, 788, 588);
       this.tweens.add({ targets: edgeFlash, alpha: 0, duration: 250, yoyo: true, repeat: 4 });
 
       this.time.delayedCall(2000, () => {
         this.tweens.add({
-          targets: [warningBg, warnText, nameText, edgeFlash], alpha: 0, duration: 300,
+          targets: [warningBg, warnText, nameText, edgeFlash],
+          alpha: 0,
+          duration: 300,
           onComplete: () => {
-            warningBg.destroy(); warnText.destroy(); nameText.destroy(); edgeFlash.destroy();
+            warningBg.destroy();
+            warnText.destroy();
+            nameText.destroy();
+            edgeFlash.destroy();
             const region = this.currentRegion;
             const narr = isFinal
               ? NARRATION.finalBossEnter[region]
@@ -4300,7 +5954,14 @@ export class GameScene extends Phaser.Scene {
     if (this.bossRageLevel >= maxRage) return;
     this.bossRageLevel++;
     const rageColors = ['#ffaa00', '#ff8800', '#ff5500', '#ff2200', '#ff0000'];
-    DamageText.show(this, 400, 160, `분노 ${this.bossRageLevel}단계!`, rageColors[this.bossRageLevel - 1], '28px');
+    DamageText.show(
+      this,
+      400,
+      160,
+      `분노 ${this.bossRageLevel}단계!`,
+      rageColors[this.bossRageLevel - 1],
+      '28px',
+    );
     this.cameras.main.shake(200, 0.01 * this.bossRageLevel);
   }
 
@@ -4330,7 +5991,7 @@ export class GameScene extends Phaser.Scene {
     }
     const isFinal = this.currentBossType === 'final';
     const hpPct = boss.hpRatio;
-    const cdReduction = (isFinal && hpPct <= 0.2) ? 0.5 : 1;
+    const cdReduction = isFinal && hpPct <= 0.2 ? 0.5 : 1;
 
     if (this.currentBossType === 'mini') {
       if (hpPct <= 0.3) {
@@ -4356,16 +6017,37 @@ export class GameScene extends Phaser.Scene {
     this.scheduleBossPattern(Math.floor(baseCd * cdReduction));
   }
 
-  private showPatternWarning(boss: Phaser.GameObjects.Container, text: string, color: string, warnTime: number, onExecute: () => void, responseHint?: string) {
+  private showPatternWarning(
+    boss: Phaser.GameObjects.Container,
+    text: string,
+    color: string,
+    warnTime: number,
+    onExecute: () => void,
+    responseHint?: string,
+  ) {
     this.bossPatternWarning?.destroy();
     const hint = responseHint ?? '방어 가능!';
     const warnText = `${text}\n${hint}`;
-    const warn = this.add.text(boss.x, boss.y - 88, warnText, {
-      fontSize: '18px', color, fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 4, align: 'center',
-    }).setOrigin(0.5).setDepth(200);
+    const warn = this.add
+      .text(boss.x, boss.y - 88, warnText, {
+        fontSize: '18px',
+        color,
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 4,
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setDepth(200);
     this.bossPatternWarning = warn;
-    this.tweens.add({ targets: warn, alpha: 0.3, duration: 300, yoyo: true, repeat: Math.floor(warnTime / 600) });
+    this.tweens.add({
+      targets: warn,
+      alpha: 0.3,
+      duration: 300,
+      yoyo: true,
+      repeat: Math.floor(warnTime / 600),
+    });
     this.highlightDefenseSkills(true);
     this.bossAttackIncoming = true;
     this.highlightResponseBtns(true);
@@ -4382,7 +6064,15 @@ export class GameScene extends Phaser.Scene {
   private highlightResponseBtns(on: boolean) {
     if (this.emergencyDefBtn) {
       if (on && this.emergencyDefCd <= 0) {
-        this.tweens.add({ targets: this.emergencyDefBtn, scaleX: 1.15, scaleY: 1.15, duration: 250, yoyo: true, repeat: -1, key: 'edef_pulse' });
+        this.tweens.add({
+          targets: this.emergencyDefBtn,
+          scaleX: 1.15,
+          scaleY: 1.15,
+          duration: 250,
+          yoyo: true,
+          repeat: -1,
+          key: 'edef_pulse',
+        });
       } else {
         this.tweens.killTweensOf(this.emergencyDefBtn);
         this.emergencyDefBtn.setScale(1);
@@ -4399,32 +6089,49 @@ export class GameScene extends Phaser.Scene {
     this.skillButtons.forEach(btn => {
       if (!btn) return;
       const def = ALL_SKILL_DEFS[btn.skillId];
-      if (def && (def.effectType === 'buff_self' || def.effectType === 'stealth' || def.id === 'w_shield_up' || def.id === 'r_stealth' || def.id === 'r_smoke')) {
+      if (
+        def &&
+        (def.effectType === 'buff_self' ||
+          def.effectType === 'stealth' ||
+          def.id === 'w_shield_up' ||
+          def.id === 'r_stealth' ||
+          def.id === 'r_smoke')
+      ) {
         btn.setHighlight(on);
       }
     });
   }
 
   private bossPatternSmash(boss: Phaser.GameObjects.Container) {
-    this.showPatternWarning(boss, '⚔ 강타 준비!', '#ffaa00', 2000, () => {
-      if (this.gameOver) return;
-      (boss as Monster).playAttackAnimation();
-      const rawDmg = Math.max(1, Math.floor(this.monsterAttackPower * 3 * this.bossRageMult * (1 - this.defenseRate)));
-      if (this.tryParryBossPattern(rawDmg)) return;
-      if (this.invincible || this.stealthActive) {
-        if (this.stealthActive) this.tryRogueDodge();
-        DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
-        return;
-      }
-      const barrier = this.tryMageBarrier(rawDmg);
-      if (barrier.absorbed) return;
-      this.playerHp = Math.max(0, this.playerHp - rawDmg);
-      this.bossHitThisRun = true;
-      this.tryWarriorBlock(rawDmg);
-      this.drawPlayerHpBar();
-      this.playBossStrongHitEffect(rawDmg);
-      if (this.playerHp <= 0) this.showGameOver();
-    }, '⚔ 방어/패링 가능!');
+    this.showPatternWarning(
+      boss,
+      '⚔ 강타 준비!',
+      '#ffaa00',
+      2000,
+      () => {
+        if (this.gameOver) return;
+        (boss as Monster).playAttackAnimation();
+        const rawDmg = Math.max(
+          1,
+          Math.floor(this.monsterAttackPower * 3 * this.bossRageMult * (1 - this.defenseRate)),
+        );
+        if (this.tryParryBossPattern(rawDmg)) return;
+        if (this.invincible || this.stealthActive) {
+          if (this.stealthActive) this.tryRogueDodge();
+          DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
+          return;
+        }
+        const barrier = this.tryMageBarrier(rawDmg);
+        if (barrier.absorbed) return;
+        this.playerHp = Math.max(0, this.playerHp - rawDmg);
+        this.bossHitThisRun = true;
+        this.tryWarriorBlock(rawDmg);
+        this.drawPlayerHpBar();
+        this.playBossStrongHitEffect(rawDmg);
+        if (this.playerHp <= 0) this.showGameOver();
+      },
+      '⚔ 방어/패링 가능!',
+    );
   }
 
   private bossPatternDefense(boss: Phaser.GameObjects.Container) {
@@ -4447,10 +6154,21 @@ export class GameScene extends Phaser.Scene {
     this.cameras.main.shake(200, 0.015);
     let hits = 0;
     const hitTimer = this.time.addEvent({
-      delay: 500, repeat: 2, callback: () => {
-        if (this.gameOver) { hitTimer.remove(); return; }
-        const dmg = Math.max(1, Math.floor(this.monsterAttackPower * 1.5 * this.bossRageMult * (1 - this.defenseRate)));
-        if (this.tryParryBossPattern(dmg)) { hitTimer.remove(); return; }
+      delay: 500,
+      repeat: 2,
+      callback: () => {
+        if (this.gameOver) {
+          hitTimer.remove();
+          return;
+        }
+        const dmg = Math.max(
+          1,
+          Math.floor(this.monsterAttackPower * 1.5 * this.bossRageMult * (1 - this.defenseRate)),
+        );
+        if (this.tryParryBossPattern(dmg)) {
+          hitTimer.remove();
+          return;
+        }
         if (this.invincible || this.stealthActive) {
           DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '20px');
           return;
@@ -4460,12 +6178,22 @@ export class GameScene extends Phaser.Scene {
         this.playerHp = Math.max(0, this.playerHp - dmg);
         this.bossHitThisRun = true;
         this.drawPlayerHpBar();
-        DamageText.show(this, 400 + Phaser.Math.Between(-30, 30), 180, `-${dmg}`, '#ff4400', '24px');
+        DamageText.show(
+          this,
+          400 + Phaser.Math.Between(-30, 30),
+          180,
+          `-${dmg}`,
+          '#ff4400',
+          '24px',
+        );
         this.cameras.main.shake(150, 0.01);
         this.flashScreenEdges();
         SoundManager.sfxBossHit();
         hits++;
-        if (this.playerHp <= 0) { hitTimer.remove(); this.showGameOver(); }
+        if (this.playerHp <= 0) {
+          hitTimer.remove();
+          this.showGameOver();
+        }
       },
     });
     this.time.delayedCall(2000, () => {
@@ -4475,24 +6203,31 @@ export class GameScene extends Phaser.Scene {
   }
 
   private bossPatternAnnihilate(boss: Phaser.GameObjects.Container) {
-    this.showPatternWarning(boss, '💀 절멸...', '#ff0000', 3000, () => {
-      if (this.gameOver) return;
-      const dmg = Math.max(1, Math.floor(this.playerMaxHp * 0.6));
-      if (this.tryParryBossPattern(dmg)) return;
-      if (this.invincible || this.stealthActive) {
-        if (this.stealthActive) this.tryRogueDodge();
-        DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
-        return;
-      }
-      const barrier = this.tryMageBarrier(dmg);
-      if (barrier.absorbed) return;
-      this.playerHp = Math.max(0, this.playerHp - dmg);
-      this.bossHitThisRun = true;
-      this.drawPlayerHpBar();
-      this.playBossStrongHitEffect(dmg);
-      this.emitParticles(400, 280, [0xff0000, 0xff4400], 14);
-      if (this.playerHp <= 0) this.showGameOver();
-    }, '⚠ 긴급방어/회피 가능!');
+    this.showPatternWarning(
+      boss,
+      '💀 절멸...',
+      '#ff0000',
+      3000,
+      () => {
+        if (this.gameOver) return;
+        const dmg = Math.max(1, Math.floor(this.playerMaxHp * 0.6));
+        if (this.tryParryBossPattern(dmg)) return;
+        if (this.invincible || this.stealthActive) {
+          if (this.stealthActive) this.tryRogueDodge();
+          DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
+          return;
+        }
+        const barrier = this.tryMageBarrier(dmg);
+        if (barrier.absorbed) return;
+        this.playerHp = Math.max(0, this.playerHp - dmg);
+        this.bossHitThisRun = true;
+        this.drawPlayerHpBar();
+        this.playBossStrongHitEffect(dmg);
+        this.emitParticles(400, 280, [0xff0000, 0xff4400], 14);
+        if (this.playerHp <= 0) this.showGameOver();
+      },
+      '⚠ 긴급방어/회피 가능!',
+    );
   }
 
   private bossPatternSummon(boss: Phaser.GameObjects.Container) {
@@ -4501,7 +6236,9 @@ export class GameScene extends Phaser.Scene {
       const r = this.regionDef;
       const pool = r.monsters;
       const data = pool[0];
-      const baseHp = Math.floor(MON_BASE_HP * Math.pow(MON_HP_GROWTH, this.stage - 1) * r.hpMult * 0.3);
+      const baseHp = Math.floor(
+        MON_BASE_HP * Math.pow(MON_HP_GROWTH, this.stage - 1) * r.hpMult * 0.3,
+      );
       const goldDrop = Math.floor(this.stage * 2);
       for (let i = 0; i < 2; i++) {
         const pos = SUB_MON_POSITIONS[i];
@@ -4509,9 +6246,13 @@ export class GameScene extends Phaser.Scene {
         const already = this.monsters.find(m => !m.isDead && Math.abs(m.x - pos.x) < 30);
         if (already) continue;
         const sub = new Monster(this, pos.x, pos.y, {
-          name: data.name, hp: baseHp, gold: goldDrop,
-          type: data.type, size: Math.floor(data.size * 0.7),
-          level: this.stage, isSub: true,
+          name: data.name,
+          hp: baseHp,
+          gold: goldDrop,
+          type: data.type,
+          size: Math.floor(data.size * 0.7),
+          level: this.stage,
+          isSub: true,
         });
         this.monsters.push(sub);
         sub.setAlpha(0);
@@ -4523,29 +6264,36 @@ export class GameScene extends Phaser.Scene {
   }
 
   private bossPatternCurse(boss: Phaser.GameObjects.Container) {
-    this.showPatternWarning(boss, '🔮 저주!', '#cc22ff', 2000, () => {
-      if (this.gameOver) return;
-      if (this.tryParryBossPattern(0)) {
-        DamageText.show(this, 400, 200, '저주 반사!', '#ffd700', '22px');
-        return;
-      }
-      if (this.invincible || this.stealthActive) {
-        if (this.stealthActive) this.tryRogueDodge();
-        DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
-        return;
-      }
-      this.skillSealed = true;
-      this.skillButtons.forEach(btn => btn?.setMpDisabled(true));
-      DamageText.show(this, 400, 250, '🔮 스킬 10초 봉인!', '#cc22ff', '24px');
-      this.cameras.main.flash(200, 100, 0, 200);
-      this.skillSealTimer?.remove();
-      this.skillSealTimer = this.time.delayedCall(10000, () => {
-        this.skillSealed = false;
-        this.skillSealTimer = undefined;
-        this.refreshSkillButtonStates();
-        DamageText.show(this, 400, 250, '봉인 해제!', '#88ff88', '20px');
-      });
-    }, '⚔ 패링/회피 가능!');
+    this.showPatternWarning(
+      boss,
+      '🔮 저주!',
+      '#cc22ff',
+      2000,
+      () => {
+        if (this.gameOver) return;
+        if (this.tryParryBossPattern(0)) {
+          DamageText.show(this, 400, 200, '저주 반사!', '#ffd700', '22px');
+          return;
+        }
+        if (this.invincible || this.stealthActive) {
+          if (this.stealthActive) this.tryRogueDodge();
+          DamageText.show(this, 400, 180, 'IMMUNE', '#66eeff', '24px');
+          return;
+        }
+        this.skillSealed = true;
+        this.skillButtons.forEach(btn => btn?.setMpDisabled(true));
+        DamageText.show(this, 400, 250, '🔮 스킬 10초 봉인!', '#cc22ff', '24px');
+        this.cameras.main.flash(200, 100, 0, 200);
+        this.skillSealTimer?.remove();
+        this.skillSealTimer = this.time.delayedCall(10000, () => {
+          this.skillSealed = false;
+          this.skillSealTimer = undefined;
+          this.refreshSkillButtonStates();
+          DamageText.show(this, 400, 250, '봉인 해제!', '#88ff88', '20px');
+        });
+      },
+      '⚔ 패링/회피 가능!',
+    );
   }
 
   /* ================================================================
@@ -4558,14 +6306,21 @@ export class GameScene extends Phaser.Scene {
     let dmg = this.effectiveAtk;
     if (this.overdriveActive) dmg = Math.floor(dmg * 2);
     if (this.hasSynergy('berserker')) dmg += 5;
-    let color = '#ffffff', size = '24px';
+    let color = '#ffffff',
+      size = '24px';
     const forceCrit = this.roguePostDodgeActive && this.stealthGuaranteeCrit;
     const odCrit = this.overdriveActive && this.selectedClass?.id === 'rogue';
     const isCrit = odCrit || forceCrit || Math.random() < this.critChance;
     let critMult = this.critDamageMult;
     if (this.hasSynergy('glass_cannon')) critMult += 0.5;
-    if (isCrit) { dmg = Math.floor(dmg * critMult); color = '#ff2222'; size = '36px'; SoundManager.sfxCritical(); }
-    else { SoundManager.sfxHit(); }
+    if (isCrit) {
+      dmg = Math.floor(dmg * critMult);
+      color = '#ff2222';
+      size = '36px';
+      SoundManager.sfxCritical();
+    } else {
+      SoundManager.sfxHit();
+    }
     if (forceCrit) {
       this.roguePostDodgeActive = false;
       this.stealthGuaranteeCrit = false;
@@ -4575,12 +6330,18 @@ export class GameScene extends Phaser.Scene {
     this.addComboHit();
 
     if (this.overdriveActive) {
-      if (isCrit) { color = '#ff4444'; size = '52px'; }
-      else { color = '#ffdd00'; size = '36px'; }
+      if (isCrit) {
+        color = '#ff4444';
+        size = '52px';
+      } else {
+        color = '#ffdd00';
+        size = '36px';
+      }
     }
 
     const dead = t.takeDamage(dmg);
-    const ox = Phaser.Math.Between(-20, 20), oy = Phaser.Math.Between(-15, 0);
+    const ox = Phaser.Math.Between(-20, 20),
+      oy = Phaser.Math.Between(-15, 0);
     DamageText.show(this, t.x + ox, t.y - 40 + oy, dmg, color, size);
 
     if (isCrit && this.hasSynergy('death_touch')) {
@@ -4591,18 +6352,41 @@ export class GameScene extends Phaser.Scene {
     if (isCrit) {
       const critLabel = this.overdriveActive ? 'CRITICAL!!' : 'CRITICAL!';
       const critSize = this.overdriveActive ? '26px' : '18px';
-      DamageText.show(this, t.x + Phaser.Math.Between(-30, 30), t.y - 70, critLabel, '#ff4444', critSize);
+      DamageText.show(
+        this,
+        t.x + Phaser.Math.Between(-30, 30),
+        t.y - 70,
+        critLabel,
+        '#ff4444',
+        critSize,
+      );
       this.cameras.main.shake(60, 0.004);
-      this.emitParticles(t.x, t.y - 20, [0xff2222, 0xff6600, 0xffcc00], this.overdriveActive ? 12 : 8);
+      this.emitParticles(
+        t.x,
+        t.y - 20,
+        [0xff2222, 0xff6600, 0xffcc00],
+        this.overdriveActive ? 12 : 8,
+      );
       if (this.stealthGuaranteeCrit) this.stealthGuaranteeCrit = false;
     } else {
-      this.emitParticles(t.x + ox, t.y + oy, this.overdriveActive ? [0xffdd00, 0xffaa00] : undefined);
+      this.emitParticles(
+        t.x + ox,
+        t.y + oy,
+        this.overdriveActive ? [0xffdd00, 0xffaa00] : undefined,
+      );
     }
     this.applyLifesteal(dmg);
 
-    if (this.overdriveActive && this.selectedClass?.id === 'warrior' && Math.random() < 0.5 && !t.isDead) {
+    if (
+      this.overdriveActive &&
+      this.selectedClass?.id === 'warrior' &&
+      Math.random() < 0.5 &&
+      !t.isDead
+    ) {
       this.monsterStunned = true;
-      this.time.delayedCall(600, () => { this.monsterStunned = false; });
+      this.time.delayedCall(600, () => {
+        this.monsterStunned = false;
+      });
       DamageText.show(this, t.x, t.y - 85, 'STUN!', '#ffcc00', '16px');
     }
 
@@ -4617,7 +6401,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     if (dead) this.handleMonsterKill(t);
-    else if (this.legendaryEffects.spd && Math.random() < 0.10) {
+    else if (this.legendaryEffects.spd && Math.random() < 0.1) {
       this.time.delayedCall(80, () => {
         if (this.gameOver || !t || t.isDead) return;
         const d2 = this.effectiveAtk;
@@ -4644,7 +6428,10 @@ export class GameScene extends Phaser.Scene {
     if (this.currentBossType !== 'none') monAtk = Math.floor(monAtk * this.bossRageMult);
     if (this.monsterWeakened) monAtk = Math.floor(monAtk * (1 - this.monsterWeakenPct));
     const madnessExtra = this.markCount('madness') * 2;
-    const rawDmg = Math.max(1, Math.floor(monAtk * atkMult * (1 - this.defenseRate)) + madnessExtra);
+    const rawDmg = Math.max(
+      1,
+      Math.floor(monAtk * atkMult * (1 - this.defenseRate)) + madnessExtra,
+    );
 
     attacker.playAttackAnimation();
 
@@ -4673,15 +6460,34 @@ export class GameScene extends Phaser.Scene {
       const reflected = Math.floor(rawDmg * this.reflectPct);
       if (reflected > 0 && this.targetMonster && !this.targetMonster.isDead) {
         const dead = this.targetMonster.takeDamage(reflected);
-        DamageText.show(this, this.targetMonster.x, this.targetMonster.y - 40, `🔄${reflected}`, '#aa5544', '18px');
+        DamageText.show(
+          this,
+          this.targetMonster.x,
+          this.targetMonster.y - 40,
+          `🔄${reflected}`,
+          '#aa5544',
+          '18px',
+        );
         if (dead) this.handleMonsterKill(this.targetMonster);
       }
     }
 
-    if (this.hasSynergy('tank') && Math.random() < 0.05 && this.targetMonster && !this.targetMonster.isDead) {
+    if (
+      this.hasSynergy('tank') &&
+      Math.random() < 0.05 &&
+      this.targetMonster &&
+      !this.targetMonster.isDead
+    ) {
       const counterDmg = Math.floor(this.effectiveAtk * 0.5);
       this.targetMonster.takeDamage(counterDmg);
-      DamageText.show(this, this.targetMonster.x, this.targetMonster.y - 50, `반격! ${counterDmg}`, '#5599cc', '16px');
+      DamageText.show(
+        this,
+        this.targetMonster.x,
+        this.targetMonster.y - 50,
+        `반격! ${counterDmg}`,
+        '#5599cc',
+        '16px',
+      );
       if (this.targetMonster.isDead) this.handleMonsterKill(this.targetMonster);
     }
 
@@ -4691,14 +6497,29 @@ export class GameScene extends Phaser.Scene {
   private flashScreenEdges() {
     const g = this.add.graphics().setDepth(150).setAlpha(0.35);
     g.fillStyle(0xff0000, 1);
-    g.fillRect(0, 0, 800, 8); g.fillRect(0, 592, 800, 8);
-    g.fillRect(0, 0, 8, 600); g.fillRect(792, 0, 8, 600);
-    this.tweens.add({ targets: g, alpha: 0, duration: 350, ease: 'Quad.easeOut', onComplete: () => g.destroy() });
+    g.fillRect(0, 0, 800, 8);
+    g.fillRect(0, 592, 800, 8);
+    g.fillRect(0, 0, 8, 600);
+    g.fillRect(792, 0, 8, 600);
+    this.tweens.add({
+      targets: g,
+      alpha: 0,
+      duration: 350,
+      ease: 'Quad.easeOut',
+      onComplete: () => g.destroy(),
+    });
   }
 
   private playHitEffect(dmg: number, isBoss: boolean) {
     const hpX = HP_BAR.x + HP_BAR.w / 2;
-    DamageText.show(this, hpX + Phaser.Math.Between(-20, 20), HP_BAR.y - 5, `-${dmg}`, '#ff8844', '22px');
+    DamageText.show(
+      this,
+      hpX + Phaser.Math.Between(-20, 20),
+      HP_BAR.y - 5,
+      `-${dmg}`,
+      '#ff8844',
+      '22px',
+    );
 
     if (isBoss) {
       this.cameras.main.shake(200, 0.008);
@@ -4718,8 +6539,14 @@ export class GameScene extends Phaser.Scene {
     const hpBar = this.playerHpFill;
     if (hpBar) {
       this.tweens.add({
-        targets: hpBar, x: HP_BAR.x + 3, duration: 40, yoyo: true, repeat: 2,
-        onComplete: () => { hpBar.x = 0; },
+        targets: hpBar,
+        x: HP_BAR.x + 3,
+        duration: 40,
+        yoyo: true,
+        repeat: 2,
+        onComplete: () => {
+          hpBar.x = 0;
+        },
       });
     }
 
@@ -4739,13 +6566,27 @@ export class GameScene extends Phaser.Scene {
     const overlay = this.add.graphics().setDepth(160).setAlpha(0.35);
     overlay.fillStyle(0xff0000, 1);
     overlay.fillRect(0, 0, 800, 600);
-    this.tweens.add({ targets: overlay, alpha: 0, duration: 300, onComplete: () => overlay.destroy() });
+    this.tweens.add({
+      targets: overlay,
+      alpha: 0,
+      duration: 300,
+      onComplete: () => overlay.destroy(),
+    });
 
     this.flashScreenEdges();
 
     const hpBar = this.playerHpFill;
     if (hpBar) {
-      this.tweens.add({ targets: hpBar, x: HP_BAR.x + 5, duration: 30, yoyo: true, repeat: 4, onComplete: () => { hpBar.x = 0; } });
+      this.tweens.add({
+        targets: hpBar,
+        x: HP_BAR.x + 5,
+        duration: 30,
+        yoyo: true,
+        repeat: 4,
+        onComplete: () => {
+          hpBar.x = 0;
+        },
+      });
     }
 
     if (this.playerHp > 0 && this.playerHp / this.playerMaxHp <= 0.3) {
@@ -4770,7 +6611,14 @@ export class GameScene extends Phaser.Scene {
     const wasMini = this.currentBossType === 'mini' && !monster.isSub;
 
     if (isBoss) {
-      DamageText.show(this, monster.x, monster.y - 50, `BOSS KILL! +${reward} G`, '#ffd700', '28px');
+      DamageText.show(
+        this,
+        monster.x,
+        monster.y - 50,
+        `BOSS KILL! +${reward} G`,
+        '#ffd700',
+        '28px',
+      );
       this.cameras.main.shake(400, 0.02);
       this.cameras.main.flash(300, 255, 200, 50);
       this.emitParticles(monster.x, monster.y, [0xffd700, 0xffaa00, 0xffffff], 20);
@@ -4778,7 +6626,12 @@ export class GameScene extends Phaser.Scene {
       const gSize = monster.isSub ? '18px' : '24px';
       DamageText.show(this, monster.x, monster.y - 30, `+${reward} G`, '#ffd700', gSize);
       this.cameras.main.shake(150, 0.008);
-      this.emitParticles(monster.x, monster.y, [0xffffff, 0xffcc00, 0xff8800], monster.isSub ? 3 : 6);
+      this.emitParticles(
+        monster.x,
+        monster.y,
+        [0xffffff, 0xffcc00, 0xff8800],
+        monster.isSub ? 3 : 6,
+      );
     }
 
     if (wasRegionBoss) {
@@ -4792,7 +6645,7 @@ export class GameScene extends Phaser.Scene {
       DamageText.show(this, monster.x, monster.y - 60, '+10 HP', '#ff88cc', '14px');
     }
 
-    const xpMult = wasRegionBoss ? 5 : (wasMini ? 3 : (monster.isSub ? 0.4 : 1));
+    const xpMult = wasRegionBoss ? 5 : wasMini ? 3 : monster.isSub ? 0.4 : 1;
     this.waveXpAccum += Math.floor((5 + this.stage * 2) * xpMult);
 
     if (monster === this.targetMonster) {
@@ -4815,13 +6668,23 @@ export class GameScene extends Phaser.Scene {
       if (this.monsters.filter(m => !m.isDead).length > 0) return;
       this.waveClearing = true;
 
-      this.poisonTimer?.remove(); this.poisonTimer = undefined;
-      this.bossSpecialTimer?.remove(); this.bossSpecialTimer = undefined;
-      this.bossPatternTimer?.remove(); this.bossPatternTimer = undefined;
-      this.bossPatternWarning?.destroy(); this.bossPatternWarning = undefined;
-      this.bossDefenseTimer?.remove(); this.bossDefenseTimer = undefined; this.bossDefenseReduction = 0;
-      this.skillSealTimer?.remove(); this.skillSealTimer = undefined; this.skillSealed = false;
-      this.bossRageTimer?.remove(); this.bossRageTimer = undefined; this.bossRageLevel = 0;
+      this.poisonTimer?.remove();
+      this.poisonTimer = undefined;
+      this.bossSpecialTimer?.remove();
+      this.bossSpecialTimer = undefined;
+      this.bossPatternTimer?.remove();
+      this.bossPatternTimer = undefined;
+      this.bossPatternWarning?.destroy();
+      this.bossPatternWarning = undefined;
+      this.bossDefenseTimer?.remove();
+      this.bossDefenseTimer = undefined;
+      this.bossDefenseReduction = 0;
+      this.skillSealTimer?.remove();
+      this.skillSealTimer = undefined;
+      this.skillSealed = false;
+      this.bossRageTimer?.remove();
+      this.bossRageTimer = undefined;
+      this.bossRageLevel = 0;
       this.chargeTimers.forEach(t => t.remove());
       this.chargeTimers = [];
       this.bossAttackIncoming = false;
@@ -4938,18 +6801,29 @@ export class GameScene extends Phaser.Scene {
     this.showNarration(NARRATION.runClear);
 
     const overlay = this.add.graphics().setDepth(400).setAlpha(0);
-    overlay.fillStyle(0x000000, 0.8); overlay.fillRect(0, 0, 800, 600);
+    overlay.fillStyle(0x000000, 0.8);
+    overlay.fillRect(0, 0, 800, 600);
     this.tweens.add({ targets: overlay, alpha: 1, duration: 600 });
 
-    const title = this.add.text(400, 80, '🏆 런 클리어! 🏆', {
-      fontSize: '48px', color: '#ffd700', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 8,
-    }).setOrigin(0.5).setDepth(401).setScale(0);
+    const title = this.add
+      .text(400, 80, '🏆 런 클리어! 🏆', {
+        fontSize: '48px',
+        color: '#ffd700',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5)
+      .setDepth(401)
+      .setScale(0);
     this.tweens.add({ targets: title, scale: 1, duration: 700, delay: 400, ease: 'Back.easeOut' });
 
     const panelG = this.add.graphics().setDepth(401);
-    panelG.fillStyle(0x1a1a30, 0.9); panelG.fillRoundedRect(200, 140, 400, 230, 16);
-    panelG.lineStyle(2, 0xffd700, 0.5); panelG.strokeRoundedRect(200, 140, 400, 230, 16);
+    panelG.fillStyle(0x1a1a30, 0.9);
+    panelG.fillRoundedRect(200, 140, 400, 230, 16);
+    panelG.lineStyle(2, 0xffd700, 0.5);
+    panelG.strokeRoundedRect(200, 140, 400, 230, 16);
     panelG.setAlpha(0);
     this.tweens.add({ targets: panelG, alpha: 1, duration: 400, delay: 800 });
 
@@ -4961,49 +6835,108 @@ export class GameScene extends Phaser.Scene {
       `획득 유물 포인트: ${milestonePts + bossPts}💎`,
     ];
     stats.forEach((s, i) => {
-      const t = this.add.text(400, 168 + i * 34, s, {
-        fontSize: '18px', color: '#ffffff', fontFamily: 'Arial, sans-serif',
-        fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(402).setAlpha(0);
+      const t = this.add
+        .text(400, 168 + i * 34, s, {
+          fontSize: '18px',
+          color: '#ffffff',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(402)
+        .setAlpha(0);
       this.tweens.add({ targets: t, alpha: 1, duration: 300, delay: 900 + i * 120 });
     });
 
     if (this.prestigeCount > 0) {
-      const pText = this.add.text(400, 380, `프레스티지 보너스: 골드 +${this.prestigeCount * 20}%`, {
-        fontSize: '14px', color: '#cc88ff', fontFamily: 'Arial', stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0.5).setDepth(402).setAlpha(0);
+      const pText = this.add
+        .text(400, 380, `프레스티지 보너스: 골드 +${this.prestigeCount * 20}%`, {
+          fontSize: '14px',
+          color: '#cc88ff',
+          fontFamily: 'Arial',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+        .setDepth(402)
+        .setAlpha(0);
       this.tweens.add({ targets: pText, alpha: 1, duration: 400, delay: 1600 });
     }
 
-    const makeBtn = (bx: number, by: number, label: string, sub: string,
-                     fc: number, hc: number, bc: number, onClick: () => void) => {
-      const bw = 200, bh = 52;
+    const makeBtn = (
+      bx: number,
+      by: number,
+      label: string,
+      sub: string,
+      fc: number,
+      hc: number,
+      bc: number,
+      onClick: () => void,
+    ) => {
+      const bw = 200,
+        bh = 52;
       const btnBg = this.add.graphics().setDepth(401).setAlpha(0);
       const draw = (hover: boolean) => {
         btnBg.clear();
-        btnBg.fillStyle(hover ? hc : fc, 1); btnBg.fillRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 14);
-        btnBg.lineStyle(2, bc, 1); btnBg.strokeRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 14);
+        btnBg.fillStyle(hover ? hc : fc, 1);
+        btnBg.fillRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 14);
+        btnBg.lineStyle(2, bc, 1);
+        btnBg.strokeRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 14);
       };
       draw(false);
-      const bt = this.add.text(bx, by - 6, label, {
-        fontSize: '18px', color: '#ffffff', fontFamily: 'Arial, sans-serif', fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(402).setAlpha(0);
-      const st = this.add.text(bx, by + 14, sub, {
-        fontSize: '10px', color: '#aaaaaa', fontFamily: 'Arial',
-      }).setOrigin(0.5).setDepth(402).setAlpha(0);
+      const bt = this.add
+        .text(bx, by - 6, label, {
+          fontSize: '18px',
+          color: '#ffffff',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setDepth(402)
+        .setAlpha(0);
+      const st = this.add
+        .text(bx, by + 14, sub, {
+          fontSize: '10px',
+          color: '#aaaaaa',
+          fontFamily: 'Arial',
+        })
+        .setOrigin(0.5)
+        .setDepth(402)
+        .setAlpha(0);
       this.tweens.add({
-        targets: [btnBg, bt, st], alpha: 1, duration: 400, delay: 1800,
+        targets: [btnBg, bt, st],
+        alpha: 1,
+        duration: 400,
+        delay: 1800,
         onComplete: () => {
-          const z = this.add.zone(bx, by, bw, bh).setInteractive({ useHandCursor: true }).setDepth(403);
+          const z = this.add
+            .zone(bx, by, bw, bh)
+            .setInteractive({ useHandCursor: true })
+            .setDepth(403);
           z.on('pointerdown', onClick);
           z.on('pointerover', () => draw(true));
           z.on('pointerout', () => draw(false));
         },
       });
     };
-    makeBtn(140, 460, '🏠 메인 메뉴', '지역 선택', 0x334455, 0x446677, 0x5588aa, () => this.scene.start('TitleScene'));
-    makeBtn(400, 460, '🔄 다시 시작', '같은 지역', 0x993333, 0xbb4444, 0xcc5555, () => this.scene.restart({ startRegion: this.startRegion, classId: this.selectedClass.id }));
-    makeBtn(660, 460, '⭐ 프레스티지', `골드 +${(this.prestigeCount + 1) * 20}%`, 0x553399, 0x7744bb, 0x9966cc, () => this.doPrestige());
+    makeBtn(140, 460, '🏠 메인 메뉴', '지역 선택', 0x334455, 0x446677, 0x5588aa, () =>
+      this.scene.start('TitleScene'),
+    );
+    makeBtn(400, 460, '🔄 다시 시작', '같은 지역', 0x993333, 0xbb4444, 0xcc5555, () =>
+      this.scene.restart({ startRegion: this.startRegion, classId: this.selectedClass.id }),
+    );
+    makeBtn(
+      660,
+      460,
+      '⭐ 프레스티지',
+      `골드 +${(this.prestigeCount + 1) * 20}%`,
+      0x553399,
+      0x7744bb,
+      0x9966cc,
+      () => this.doPrestige(),
+    );
   }
 
   private doPrestige() {
@@ -5031,11 +6964,19 @@ export class GameScene extends Phaser.Scene {
     }
     this.gameOver = true;
     this.bossSpecialTimer?.remove();
-    this.bossPatternTimer?.remove(); this.bossPatternTimer = undefined;
-    this.bossPatternWarning?.destroy(); this.bossPatternWarning = undefined;
-    this.bossDefenseTimer?.remove(); this.bossDefenseTimer = undefined; this.bossDefenseReduction = 0;
-    this.skillSealTimer?.remove(); this.skillSealTimer = undefined; this.skillSealed = false;
-    this.bossRageTimer?.remove(); this.bossRageTimer = undefined; this.bossRageLevel = 0;
+    this.bossPatternTimer?.remove();
+    this.bossPatternTimer = undefined;
+    this.bossPatternWarning?.destroy();
+    this.bossPatternWarning = undefined;
+    this.bossDefenseTimer?.remove();
+    this.bossDefenseTimer = undefined;
+    this.bossDefenseReduction = 0;
+    this.skillSealTimer?.remove();
+    this.skillSealTimer = undefined;
+    this.skillSealed = false;
+    this.bossRageTimer?.remove();
+    this.bossRageTimer = undefined;
+    this.bossRageLevel = 0;
     this.monsterAttackTimer?.remove();
     this.poisonTimer?.remove();
     this.bossAttackIncoming = false;
@@ -5051,7 +6992,11 @@ export class GameScene extends Phaser.Scene {
 
     const soulGold = Math.floor(this.gold * 0.5);
     const existingSoul = SaveManager.loadSoul();
-    if (existingSoul && existingSoul.stage === this.stage && existingSoul.region === this.startRegion) {
+    if (
+      existingSoul &&
+      existingSoul.stage === this.stage &&
+      existingSoul.region === this.startRegion
+    ) {
       SaveManager.deleteSoul();
     }
     if (soulGold > 0) {
@@ -5075,64 +7020,128 @@ export class GameScene extends Phaser.Scene {
     this.showNarration(NARRATION.gameOver);
 
     const overlay = this.add.graphics().setDepth(400).setAlpha(0);
-    overlay.fillStyle(0x000000, 0.75); overlay.fillRect(0, 0, 800, 600);
+    overlay.fillStyle(0x000000, 0.75);
+    overlay.fillRect(0, 0, 800, 600);
     this.tweens.add({ targets: overlay, alpha: 1, duration: 500 });
-    const title = this.add.text(400, 130, 'GAME OVER', {
-      fontSize: '64px', color: '#ff3333', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 8,
-    }).setOrigin(0.5).setDepth(401).setScale(0);
+    const title = this.add
+      .text(400, 130, 'GAME OVER', {
+        fontSize: '64px',
+        color: '#ff3333',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 8,
+      })
+      .setOrigin(0.5)
+      .setDepth(401)
+      .setScale(0);
     this.tweens.add({ targets: title, scale: 1, duration: 600, delay: 300, ease: 'Back.easeOut' });
 
     const milestonePts = this.calculateMilestonePoints();
     const ptsStr = milestonePts > 0 ? ` · +${milestonePts}💎` : '';
-    this.add.text(400, 210, `Stage ${this.localStage}/20 · Lv.${this.level} · ${this.totalKills} kills${ptsStr}`, {
-      fontSize: '20px', color: '#cccccc', fontFamily: 'Arial, sans-serif',
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(401);
+    this.add
+      .text(
+        400,
+        210,
+        `Stage ${this.localStage}/20 · Lv.${this.level} · ${this.totalKills} kills${ptsStr}`,
+        {
+          fontSize: '20px',
+          color: '#cccccc',
+          fontFamily: 'Arial, sans-serif',
+          stroke: '#000000',
+          strokeThickness: 3,
+        },
+      )
+      .setOrigin(0.5)
+      .setDepth(401);
 
     if (soulGold > 0) {
-      this.add.text(400, 240, `💀 소울 드롭: ${soulGold}G (Stage ${this.localStage})`, {
-        fontSize: '16px', color: '#ddaa44', fontFamily: 'Arial, sans-serif',
-        stroke: '#000000', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(401);
+      this.add
+        .text(400, 240, `💀 소울 드롭: ${soulGold}G (Stage ${this.localStage})`, {
+          fontSize: '16px',
+          color: '#ddaa44',
+          fontFamily: 'Arial, sans-serif',
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(401);
     }
 
     if (newMark) {
       const md = MARK_DEFS[newMark];
       const markY = soulGold > 0 ? 268 : 248;
-      const markText = this.add.text(400, markY,
-        `${md.icon} ${md.name} 획득! (${md.bonus} / ${md.penalty})`, {
-        fontSize: '15px', color: '#cc44ff', fontFamily: 'Arial, sans-serif',
-        stroke: '#000000', strokeThickness: 3,
-      }).setOrigin(0.5).setDepth(401).setAlpha(0);
+      const markText = this.add
+        .text(400, markY, `${md.icon} ${md.name} 획득! (${md.bonus} / ${md.penalty})`, {
+          fontSize: '15px',
+          color: '#cc44ff',
+          fontFamily: 'Arial, sans-serif',
+          stroke: '#000000',
+          strokeThickness: 3,
+        })
+        .setOrigin(0.5)
+        .setDepth(401)
+        .setAlpha(0);
       this.tweens.add({ targets: markText, alpha: 1, duration: 600, delay: 800 });
 
       if (this.deathMarks.length >= 5) {
-        const cursedText = this.add.text(400, markY + 22, '⚠ "저주받은 자" - 모든 효과 2배!', {
-          fontSize: '14px', color: '#ff2222', fontFamily: 'Arial, sans-serif',
-          fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-        }).setOrigin(0.5).setDepth(401).setAlpha(0);
+        const cursedText = this.add
+          .text(400, markY + 22, '⚠ "저주받은 자" - 모든 효과 2배!', {
+            fontSize: '14px',
+            color: '#ff2222',
+            fontFamily: 'Arial, sans-serif',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 3,
+          })
+          .setOrigin(0.5)
+          .setDepth(401)
+          .setAlpha(0);
         this.tweens.add({ targets: cursedText, alpha: 1, duration: 600, delay: 1200 });
       }
     }
 
     const btnY = 350;
-    const makeGoBtn = (bx: number, by: number, label: string, fc: number, hc: number, bc: number, onClick: () => void) => {
-      const bw = 220, bh = 48;
+    const makeGoBtn = (
+      bx: number,
+      by: number,
+      label: string,
+      fc: number,
+      hc: number,
+      bc: number,
+      onClick: () => void,
+    ) => {
+      const bw = 220,
+        bh = 48;
       const g = this.add.graphics().setDepth(401).setAlpha(0);
       const draw = (hover: boolean) => {
         g.clear();
-        g.fillStyle(hover ? hc : fc, 1); g.fillRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 14);
-        g.lineStyle(2, bc, 1); g.strokeRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 14);
+        g.fillStyle(hover ? hc : fc, 1);
+        g.fillRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 14);
+        g.lineStyle(2, bc, 1);
+        g.strokeRoundedRect(bx - bw / 2, by - bh / 2, bw, bh, 14);
       };
       draw(false);
-      const t = this.add.text(bx, by, label, {
-        fontSize: '20px', color: '#ffffff', fontFamily: 'Arial, sans-serif', fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(402).setAlpha(0);
+      const t = this.add
+        .text(bx, by, label, {
+          fontSize: '20px',
+          color: '#ffffff',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setDepth(402)
+        .setAlpha(0);
       this.tweens.add({
-        targets: [g, t], alpha: 1, duration: 400, delay: 1000,
+        targets: [g, t],
+        alpha: 1,
+        duration: 400,
+        delay: 1000,
         onComplete: () => {
-          const z = this.add.zone(bx, by, bw, bh).setInteractive({ useHandCursor: true }).setDepth(403);
+          const z = this.add
+            .zone(bx, by, bw, bh)
+            .setInteractive({ useHandCursor: true })
+            .setDepth(403);
           z.on('pointerdown', onClick);
           z.on('pointerover', () => draw(true));
           z.on('pointerout', () => draw(false));
@@ -5140,10 +7149,12 @@ export class GameScene extends Phaser.Scene {
       });
     };
 
-    makeGoBtn(260, btnY, '🔄 다시 시작', 0x993333, 0xbb4444, 0xcc5555,
-      () => this.scene.restart({ startRegion: this.startRegion, classId: this.selectedClass.id }));
-    makeGoBtn(540, btnY, '🏠 메인 메뉴', 0x334455, 0x446677, 0x5588aa,
-      () => this.scene.start('TitleScene'));
+    makeGoBtn(260, btnY, '🔄 다시 시작', 0x993333, 0xbb4444, 0xcc5555, () =>
+      this.scene.restart({ startRegion: this.startRegion, classId: this.selectedClass.id }),
+    );
+    makeGoBtn(540, btnY, '🏠 메인 메뉴', 0x334455, 0x446677, 0x5588aa, () =>
+      this.scene.start('TitleScene'),
+    );
   }
 
   /* ================================================================
@@ -5173,7 +7184,9 @@ export class GameScene extends Phaser.Scene {
     this.relicPtsText.setText(`💎 ${this.relicPoints}`);
 
     this.goldText.setText(`💰 ${this.gold}G`);
-    const atkStr = this.atkBuffActive ? `⚔ ATK: ${this.effectiveAtk} 🔥` : `⚔ ATK: ${this.effectiveAtk}`;
+    const atkStr = this.atkBuffActive
+      ? `⚔ ATK: ${this.effectiveAtk} 🔥`
+      : `⚔ ATK: ${this.effectiveAtk}`;
     this.statsLine1.setText(atkStr);
     this.statsLine1.setColor(this.atkBuffActive ? '#ff8844' : '#ff6b6b');
     this.statsLine2.setText(`💨 SPD: ${this.attacksPerSec.toFixed(2)}/s`);
@@ -5201,20 +7214,20 @@ export class GameScene extends Phaser.Scene {
 
   private checkAchievements() {
     const hs = this.highestStageCleared;
-    if (hs >= 1)  this.tryUnlock('stage_1');
+    if (hs >= 1) this.tryUnlock('stage_1');
     if (hs >= 10) this.tryUnlock('stage_10');
     if (hs >= 20) this.tryUnlock('stage_20');
     if (hs >= 40) this.tryUnlock('stage_40');
     if (hs >= 60) this.tryUnlock('stage_60');
 
     const totalKills = this.achData.totalKillsAll + this.totalKills;
-    if (totalKills >= 100)  this.tryUnlock('kill_100');
+    if (totalKills >= 100) this.tryUnlock('kill_100');
     if (totalKills >= 1000) this.tryUnlock('kill_1000');
 
     const ownedStatCards = Object.values(this.cardLevels).filter(v => v > 0).length;
     const ownedSkills = Object.values(this.skillLevels).filter(v => v > 0).length;
     const ownedCards = ownedStatCards + ownedSkills;
-    if (ownedCards >= 5)  this.tryUnlock('cards_5');
+    if (ownedCards >= 5) this.tryUnlock('cards_5');
     if (ownedCards >= 10) this.tryUnlock('cards_10');
 
     if (this.activeSynergies.length >= 3) this.tryUnlock('synergy_3');
@@ -5224,8 +7237,8 @@ export class GameScene extends Phaser.Scene {
     if (legendaryCount >= 3) this.tryUnlock('legendary_3');
 
     if (hs >= 20 && this.selectedClass.id === 'warrior') this.tryUnlock('warrior_clear');
-    if (hs >= 20 && this.selectedClass.id === 'mage')    this.tryUnlock('mage_clear');
-    if (hs >= 20 && this.selectedClass.id === 'rogue')   this.tryUnlock('rogue_clear');
+    if (hs >= 20 && this.selectedClass.id === 'mage') this.tryUnlock('mage_clear');
+    if (hs >= 20 && this.selectedClass.id === 'rogue') this.tryUnlock('rogue_clear');
 
     if (hs >= 10 && !this.potionUsedThisRun) this.tryUnlock('no_potion_10');
 
@@ -5256,33 +7269,61 @@ export class GameScene extends Phaser.Scene {
 
   private showAchievementPopup(icon: string, name: string) {
     SoundManager.sfxAchievement();
-    const px = 680, py = 540, pw = 220, ph = 50;
+    const px = 680,
+      py = 540,
+      pw = 220,
+      ph = 50;
     const bg = this.add.graphics().setDepth(600).setAlpha(0);
     bg.fillStyle(0x1a1a2e, 0.9);
     bg.fillRoundedRect(px - pw / 2, py - ph / 2, pw, ph, 10);
     bg.lineStyle(2, 0xffd700, 0.8);
     bg.strokeRoundedRect(px - pw / 2, py - ph / 2, pw, ph, 10);
 
-    const iconT = this.add.text(px - pw / 2 + 14, py - 2, icon, {
-      fontSize: '22px',
-    }).setOrigin(0, 0.5).setDepth(601).setAlpha(0);
+    const iconT = this.add
+      .text(px - pw / 2 + 14, py - 2, icon, {
+        fontSize: '22px',
+      })
+      .setOrigin(0, 0.5)
+      .setDepth(601)
+      .setAlpha(0);
 
-    const label = this.add.text(px - pw / 2 + 42, py - 9, '🏆 업적 달성!', {
-      fontSize: '9px', color: '#ffd700', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setDepth(601).setAlpha(0);
+    const label = this.add
+      .text(px - pw / 2 + 42, py - 9, '🏆 업적 달성!', {
+        fontSize: '9px',
+        color: '#ffd700',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setDepth(601)
+      .setAlpha(0);
 
-    const nameT = this.add.text(px - pw / 2 + 42, py + 5, name, {
-      fontSize: '13px', color: '#ffffff', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2,
-    }).setDepth(601).setAlpha(0);
+    const nameT = this.add
+      .text(px - pw / 2 + 42, py + 5, name, {
+        fontSize: '13px',
+        color: '#ffffff',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setDepth(601)
+      .setAlpha(0);
 
     const els = [bg, iconT, label, nameT];
     this.tweens.add({
-      targets: els, alpha: 1, duration: 300, ease: 'Sine.easeOut',
+      targets: els,
+      alpha: 1,
+      duration: 300,
+      ease: 'Sine.easeOut',
     });
     this.tweens.add({
-      targets: els, alpha: 0, duration: 400, delay: 2600, ease: 'Sine.easeIn',
+      targets: els,
+      alpha: 0,
+      duration: 400,
+      delay: 2600,
+      ease: 'Sine.easeIn',
       onComplete: () => els.forEach(e => e.destroy()),
     });
   }
@@ -5336,7 +7377,7 @@ export class GameScene extends Phaser.Scene {
       const best: number = this.registry.get(`bestLocal_${ri}`) ?? 0;
       if (best > 0) perm.bestLocal[ri] = Math.max(perm.bestLocal[ri] ?? 0, best);
     }
-    perm.totalPlayCount = (perm.totalPlayCount ?? 0);
+    perm.totalPlayCount = perm.totalPlayCount ?? 0;
     SaveManager.savePermanent(perm);
   }
 
@@ -5366,12 +7407,18 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showSaveIcon() {
-    const icon = this.add.text(770, 8, '💾', {
-      fontSize: '20px',
-    }).setDepth(500).setAlpha(0);
+    const icon = this.add
+      .text(770, 8, '💾', {
+        fontSize: '20px',
+      })
+      .setDepth(500)
+      .setAlpha(0);
     this.tweens.add({
-      targets: icon, alpha: 1, duration: 150,
-      yoyo: true, hold: 350,
+      targets: icon,
+      alpha: 1,
+      duration: 150,
+      yoyo: true,
+      hold: 350,
       onComplete: () => icon.destroy(),
     });
   }
@@ -5406,9 +7453,14 @@ export class GameScene extends Phaser.Scene {
       p.setTint(Phaser.Math.RND.pick(c));
       p.setScale(Phaser.Math.FloatBetween(0.8, 2.5));
       this.tweens.add({
-        targets: p, x: x + Phaser.Math.Between(-60, 60), y: y + Phaser.Math.Between(-80, -20),
-        alpha: 0, scale: 0, duration: Phaser.Math.Between(300, 700),
-        ease: 'Quad.easeOut', onComplete: () => p.destroy(),
+        targets: p,
+        x: x + Phaser.Math.Between(-60, 60),
+        y: y + Phaser.Math.Between(-80, -20),
+        alpha: 0,
+        scale: 0,
+        duration: Phaser.Math.Between(300, 700),
+        ease: 'Quad.easeOut',
+        onComplete: () => p.destroy(),
       });
     }
   }
@@ -5434,21 +7486,45 @@ export class GameScene extends Phaser.Scene {
   }
 
   private showSynergyActivation(syn: SynergyDef) {
-    const txt = this.add.text(400, 200, `🔗 시너지 발동! ${syn.icon}\n${syn.name}`, {
-      fontSize: '28px', color: '#44ffaa', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 6, align: 'center',
-    }).setOrigin(0.5).setDepth(400).setAlpha(0).setScale(0.5);
-    const sub = this.add.text(400, 248, syn.desc, {
-      fontSize: '16px', color: '#aaffcc', fontFamily: 'Arial',
-      stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(400).setAlpha(0);
+    const txt = this.add
+      .text(400, 200, `🔗 시너지 발동! ${syn.icon}\n${syn.name}`, {
+        fontSize: '28px',
+        color: '#44ffaa',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 6,
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setDepth(400)
+      .setAlpha(0)
+      .setScale(0.5);
+    const sub = this.add
+      .text(400, 248, syn.desc, {
+        fontSize: '16px',
+        color: '#aaffcc',
+        fontFamily: 'Arial',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(400)
+      .setAlpha(0);
     this.tweens.add({ targets: txt, alpha: 1, scale: 1, duration: 300, ease: 'Back.easeOut' });
     this.tweens.add({ targets: sub, alpha: 1, duration: 300, delay: 100 });
     this.emitParticles(400, 220, [0x44ffaa, 0x88ffcc, 0x22cc88], 12);
     this.cameras.main.flash(200, 68, 255, 170);
     this.time.delayedCall(2000, () => {
-      this.tweens.add({ targets: [txt, sub], alpha: 0, y: '-=30', duration: 400,
-        onComplete: () => { txt.destroy(); sub.destroy(); },
+      this.tweens.add({
+        targets: [txt, sub],
+        alpha: 0,
+        y: '-=30',
+        duration: 400,
+        onComplete: () => {
+          txt.destroy();
+          sub.destroy();
+        },
       });
     });
   }
@@ -5469,10 +7545,16 @@ export class GameScene extends Phaser.Scene {
       bg.lineStyle(1, 0x44ffaa, 0.5);
       bg.strokeRoundedRect(-60, y - 10, 120, 24, 6);
       this.synergyContainer!.add(bg);
-      const txt = this.add.text(0, y, `${syn.icon} ${syn.name}`, {
-        fontSize: '10px', color: '#44ffaa', fontFamily: 'Arial', fontStyle: 'bold',
-        stroke: '#000000', strokeThickness: 2,
-      }).setOrigin(0.5);
+      const txt = this.add
+        .text(0, y, `${syn.icon} ${syn.name}`, {
+          fontSize: '10px',
+          color: '#44ffaa',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5);
       this.synergyContainer!.add(txt);
     });
   }
@@ -5482,27 +7564,60 @@ export class GameScene extends Phaser.Scene {
      ================================================================ */
 
   private showLegendaryActivation(card: CardDef) {
-    const txt = this.add.text(400, 160, `★ 전설 발동! ★\n${card.icon} ${card.name}`, {
-      fontSize: '32px', color: '#ffd700', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 7, align: 'center',
-    }).setOrigin(0.5).setDepth(400).setAlpha(0).setScale(0.3);
-    const desc = this.add.text(400, 215, LEGENDARY_DESCS[card.id] ?? '', {
-      fontSize: '18px', color: '#ffee88', fontFamily: 'Arial',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(400).setAlpha(0);
+    const txt = this.add
+      .text(400, 160, `★ 전설 발동! ★\n${card.icon} ${card.name}`, {
+        fontSize: '32px',
+        color: '#ffd700',
+        fontFamily: 'Arial, sans-serif',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 7,
+        align: 'center',
+      })
+      .setOrigin(0.5)
+      .setDepth(400)
+      .setAlpha(0)
+      .setScale(0.3);
+    const desc = this.add
+      .text(400, 215, LEGENDARY_DESCS[card.id] ?? '', {
+        fontSize: '18px',
+        color: '#ffee88',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5)
+      .setDepth(400)
+      .setAlpha(0);
     this.tweens.add({ targets: txt, alpha: 1, scale: 1, duration: 400, ease: 'Back.easeOut' });
     this.tweens.add({ targets: desc, alpha: 1, duration: 300, delay: 200 });
     this.emitParticles(400, 180, [0xffd700, 0xffaa00, 0xffffff, 0xffcc44], 18);
     this.cameras.main.flash(300, 255, 215, 0);
 
     const ring = this.add.graphics().setDepth(399).setAlpha(0.8);
-    ring.lineStyle(3, 0xffd700, 1); ring.strokeCircle(400, 180, 15);
-    this.tweens.add({ targets: ring, scaleX: 8, scaleY: 8, alpha: 0, duration: 800,
-      ease: 'Quad.easeOut', onComplete: () => ring.destroy() });
+    ring.lineStyle(3, 0xffd700, 1);
+    ring.strokeCircle(400, 180, 15);
+    this.tweens.add({
+      targets: ring,
+      scaleX: 8,
+      scaleY: 8,
+      alpha: 0,
+      duration: 800,
+      ease: 'Quad.easeOut',
+      onComplete: () => ring.destroy(),
+    });
 
     this.time.delayedCall(2200, () => {
-      this.tweens.add({ targets: [txt, desc], alpha: 0, y: '-=40', duration: 500,
-        onComplete: () => { txt.destroy(); desc.destroy(); },
+      this.tweens.add({
+        targets: [txt, desc],
+        alpha: 0,
+        y: '-=40',
+        duration: 500,
+        onComplete: () => {
+          txt.destroy();
+          desc.destroy();
+        },
       });
     });
   }
@@ -5514,17 +7629,27 @@ export class GameScene extends Phaser.Scene {
   private toggleCheatInvincible() {
     this.cheatInvincible = !this.cheatInvincible;
     this.invincible = this.cheatInvincible;
-    DamageText.show(this, 400, 300,
+    DamageText.show(
+      this,
+      400,
+      300,
       this.cheatInvincible ? 'CHEAT: 무적 ON' : 'CHEAT: 무적 OFF',
-      this.cheatInvincible ? '#00ff00' : '#ff4444', '24px');
+      this.cheatInvincible ? '#00ff00' : '#ff4444',
+      '24px',
+    );
     this.updateUI();
   }
 
   private toggleCheatAtk() {
     this.cheatAtk = !this.cheatAtk;
-    DamageText.show(this, 400, 330,
+    DamageText.show(
+      this,
+      400,
+      330,
       this.cheatAtk ? 'CHEAT: ATK x100 ON' : 'CHEAT: ATK x100 OFF',
-      this.cheatAtk ? '#00ff00' : '#ff4444', '24px');
+      this.cheatAtk ? '#00ff00' : '#ff4444',
+      '24px',
+    );
     this.updateUI();
   }
 
@@ -5542,31 +7667,61 @@ export class GameScene extends Phaser.Scene {
     this.time.paused = true;
     const els = this.pauseElements;
     const bg = this.add.graphics().setDepth(500).setAlpha(0);
-    bg.fillStyle(0x000000, 0.75); bg.fillRect(0, 0, 800, 600);
-    els.push(bg); this.tweens.add({ targets: bg, alpha: 1, duration: 200 });
+    bg.fillStyle(0x000000, 0.75);
+    bg.fillRect(0, 0, 800, 600);
+    els.push(bg);
+    this.tweens.add({ targets: bg, alpha: 1, duration: 200 });
 
     const panel = this.add.graphics().setDepth(501);
-    panel.fillStyle(0x1a1a30, 0.95); panel.fillRoundedRect(250, 160, 300, 280, 16);
-    panel.lineStyle(2, 0x4466aa, 0.8); panel.strokeRoundedRect(250, 160, 300, 280, 16);
+    panel.fillStyle(0x1a1a30, 0.95);
+    panel.fillRoundedRect(250, 160, 300, 280, 16);
+    panel.lineStyle(2, 0x4466aa, 0.8);
+    panel.strokeRoundedRect(250, 160, 300, 280, 16);
     els.push(panel);
 
-    els.push(this.add.text(400, 195, '⏸ 일시 정지', {
-      fontSize: '28px', color: '#ffffff', fontFamily: 'Arial, sans-serif',
-      fontStyle: 'bold', stroke: '#000000', strokeThickness: 4,
-    }).setOrigin(0.5).setDepth(502));
+    els.push(
+      this.add
+        .text(400, 195, '⏸ 일시 정지', {
+          fontSize: '28px',
+          color: '#ffffff',
+          fontFamily: 'Arial, sans-serif',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 4,
+        })
+        .setOrigin(0.5)
+        .setDepth(502),
+    );
 
-    const makeBtn = (y: number, label: string, fc: number, hc: number, bc: number, onClick: () => void) => {
-      const bw = 220, bh = 44;
+    const makeBtn = (
+      y: number,
+      label: string,
+      fc: number,
+      hc: number,
+      bc: number,
+      onClick: () => void,
+    ) => {
+      const bw = 220,
+        bh = 44;
       const g = this.add.graphics().setDepth(501);
       const draw = (hover: boolean) => {
         g.clear();
-        g.fillStyle(hover ? hc : fc, 1); g.fillRoundedRect(400 - bw / 2, y - bh / 2, bw, bh, 10);
-        g.lineStyle(2, bc, 1); g.strokeRoundedRect(400 - bw / 2, y - bh / 2, bw, bh, 10);
+        g.fillStyle(hover ? hc : fc, 1);
+        g.fillRoundedRect(400 - bw / 2, y - bh / 2, bw, bh, 10);
+        g.lineStyle(2, bc, 1);
+        g.strokeRoundedRect(400 - bw / 2, y - bh / 2, bw, bh, 10);
       };
-      draw(false); els.push(g);
-      const t = this.add.text(400, y, label, {
-        fontSize: '18px', color: '#ffffff', fontFamily: 'Arial', fontStyle: 'bold',
-      }).setOrigin(0.5).setDepth(502);
+      draw(false);
+      els.push(g);
+      const t = this.add
+        .text(400, y, label, {
+          fontSize: '18px',
+          color: '#ffffff',
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+        })
+        .setOrigin(0.5)
+        .setDepth(502);
       els.push(t);
       const z = this.add.zone(400, y, bw, bh).setInteractive({ useHandCursor: true }).setDepth(503);
       z.on('pointerover', () => draw(true));

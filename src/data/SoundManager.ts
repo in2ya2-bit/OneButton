@@ -26,13 +26,29 @@ function ensureCtx() {
 }
 
 function stopBgm() {
-  if (bgmInterval !== null) { clearInterval(bgmInterval); bgmInterval = null; }
-  currentBgm.forEach(o => { try { o.stop(); } catch { /* */ } });
+  if (bgmInterval !== null) {
+    clearInterval(bgmInterval);
+    bgmInterval = null;
+  }
+  currentBgm.forEach(o => {
+    try {
+      o.stop();
+    } catch {
+      /* */
+    }
+  });
   currentBgm = [];
   currentBgmId = '';
 }
 
-function playNote(freq: number, type: OscillatorType, dur: number, gain: GainNode, vol = 0.15, delay = 0) {
+function playNote(
+  freq: number,
+  type: OscillatorType,
+  dur: number,
+  gain: GainNode,
+  vol = 0.15,
+  delay = 0,
+) {
   const c = ensureCtx();
   const osc = c.createOscillator();
   const g = c.createGain();
@@ -48,7 +64,12 @@ function playNote(freq: number, type: OscillatorType, dur: number, gain: GainNod
   return osc;
 }
 
-function loopBgm(id: string, notes: [number, OscillatorType, number][], tempo: number, gain: GainNode) {
+function loopBgm(
+  id: string,
+  notes: [number, OscillatorType, number][],
+  tempo: number,
+  gain: GainNode,
+) {
   if (currentBgmId === id) return;
   stopBgm();
   currentBgmId = id;
@@ -75,42 +96,91 @@ function loopBgm(id: string, notes: [number, OscillatorType, number][], tempo: n
   };
 
   schedule();
-  bgmInterval = setInterval(() => {
-    if (!ctx || currentBgmId !== id) { if (bgmInterval !== null) { clearInterval(bgmInterval); bgmInterval = null; } return; }
-    time = ctx.currentTime + 0.05;
-    currentBgm.forEach(o => { try { o.stop(); } catch { /* */ } });
-    currentBgm = [];
-    schedule();
-  }, totalDur * 1000 - 200);
+  bgmInterval = setInterval(
+    () => {
+      if (!ctx || currentBgmId !== id) {
+        if (bgmInterval !== null) {
+          clearInterval(bgmInterval);
+          bgmInterval = null;
+        }
+        return;
+      }
+      time = ctx.currentTime + 0.05;
+      currentBgm.forEach(o => {
+        try {
+          o.stop();
+        } catch {
+          /* */
+        }
+      });
+      currentBgm = [];
+      schedule();
+    },
+    totalDur * 1000 - 200,
+  );
 }
 
 /* ========== BGM DEFINITIONS ========== */
 
 const TITLE_NOTES: [number, OscillatorType, number][] = [
-  [220, 'sine', 2], [262, 'sine', 2], [330, 'sine', 2], [294, 'sine', 2],
-  [262, 'sine', 2], [247, 'sine', 2], [220, 'sine', 2], [196, 'sine', 2],
-  [220, 'sine', 2], [262, 'sine', 1], [330, 'sine', 1], [349, 'sine', 2], [330, 'sine', 2],
-  [294, 'sine', 2], [262, 'sine', 2], [247, 'sine', 2], [220, 'sine', 2],
+  [220, 'sine', 2],
+  [262, 'sine', 2],
+  [330, 'sine', 2],
+  [294, 'sine', 2],
+  [262, 'sine', 2],
+  [247, 'sine', 2],
+  [220, 'sine', 2],
+  [196, 'sine', 2],
+  [220, 'sine', 2],
+  [262, 'sine', 1],
+  [330, 'sine', 1],
+  [349, 'sine', 2],
+  [330, 'sine', 2],
+  [294, 'sine', 2],
+  [262, 'sine', 2],
+  [247, 'sine', 2],
+  [220, 'sine', 2],
 ];
 
 const BATTLE_NOTES: [number, OscillatorType, number][] = [
-  [165, 'sawtooth', 1], [196, 'sawtooth', 1], [220, 'sawtooth', 1], [247, 'sawtooth', 1],
-  [220, 'sawtooth', 1], [196, 'sawtooth', 1], [165, 'sawtooth', 2],
-  [175, 'sawtooth', 1], [220, 'sawtooth', 1], [262, 'sawtooth', 1], [220, 'sawtooth', 1],
-  [175, 'sawtooth', 2], [165, 'sawtooth', 2],
+  [165, 'sawtooth', 1],
+  [196, 'sawtooth', 1],
+  [220, 'sawtooth', 1],
+  [247, 'sawtooth', 1],
+  [220, 'sawtooth', 1],
+  [196, 'sawtooth', 1],
+  [165, 'sawtooth', 2],
+  [175, 'sawtooth', 1],
+  [220, 'sawtooth', 1],
+  [262, 'sawtooth', 1],
+  [220, 'sawtooth', 1],
+  [175, 'sawtooth', 2],
+  [165, 'sawtooth', 2],
 ];
 
 const BOSS_NOTES: [number, OscillatorType, number][] = [
-  [110, 'square', 1], [131, 'square', 1], [110, 'square', 1], [147, 'square', 1],
-  [131, 'square', 1], [110, 'square', 1], [98, 'square', 2],
-  [110, 'square', 1], [147, 'square', 1], [165, 'square', 1], [147, 'square', 1],
-  [131, 'square', 1], [110, 'square', 1], [98, 'square', 2],
+  [110, 'square', 1],
+  [131, 'square', 1],
+  [110, 'square', 1],
+  [147, 'square', 1],
+  [131, 'square', 1],
+  [110, 'square', 1],
+  [98, 'square', 2],
+  [110, 'square', 1],
+  [147, 'square', 1],
+  [165, 'square', 1],
+  [147, 'square', 1],
+  [131, 'square', 1],
+  [110, 'square', 1],
+  [98, 'square', 2],
 ];
 
 /* ========== PUBLIC API ========== */
 
 export const SoundManager = {
-  init() { ensureCtx(); },
+  init() {
+    ensureCtx();
+  },
 
   updateSettings(s: SettingsData) {
     settings = s;
@@ -120,9 +190,18 @@ export const SoundManager = {
 
   /* ---- BGM ---- */
 
-  playTitleBgm() { ensureCtx(); if (bgmGain) loopBgm('title', TITLE_NOTES, 0.45, bgmGain); },
-  playBattleBgm() { ensureCtx(); if (bgmGain) loopBgm('battle', BATTLE_NOTES, 0.22, bgmGain); },
-  playBossBgm() { ensureCtx(); if (bgmGain) loopBgm('boss', BOSS_NOTES, 0.18, bgmGain); },
+  playTitleBgm() {
+    ensureCtx();
+    if (bgmGain) loopBgm('title', TITLE_NOTES, 0.45, bgmGain);
+  },
+  playBattleBgm() {
+    ensureCtx();
+    if (bgmGain) loopBgm('battle', BATTLE_NOTES, 0.22, bgmGain);
+  },
+  playBossBgm() {
+    ensureCtx();
+    if (bgmGain) loopBgm('boss', BOSS_NOTES, 0.18, bgmGain);
+  },
 
   playClearFanfare() {
     ensureCtx();
@@ -137,102 +216,140 @@ export const SoundManager = {
     [110, 98, 87, 82].forEach((f, i) => playNote(f, 'sine', 1.5, bgmGain!, 0.12, i * 0.5));
   },
 
-  stopBgm() { stopBgm(); },
+  stopBgm() {
+    stopBgm();
+  },
 
   /* ---- SFX ---- */
 
-  sfxHit() { ensureCtx(); if (sfxGain) playNote(800, 'square', 0.06, sfxGain, 0.2); },
+  sfxHit() {
+    ensureCtx();
+    if (sfxGain) playNote(800, 'square', 0.06, sfxGain, 0.2);
+  },
   sfxCritical() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(1000, 'sawtooth', 0.08, sfxGain, 0.25);
     playNote(1400, 'sawtooth', 0.06, sfxGain, 0.2, 0.04);
   },
   sfxFireball() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(200, 'sawtooth', 0.3, sfxGain, 0.15);
     playNote(400, 'sawtooth', 0.15, sfxGain, 0.1, 0.1);
   },
-  sfxPoison() { ensureCtx(); if (sfxGain) playNote(300, 'sine', 0.2, sfxGain, 0.12); },
+  sfxPoison() {
+    ensureCtx();
+    if (sfxGain) playNote(300, 'sine', 0.2, sfxGain, 0.12);
+  },
   sfxExplosion() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(100, 'sawtooth', 0.3, sfxGain, 0.2);
     playNote(60, 'square', 0.2, sfxGain, 0.15, 0.05);
   },
-  sfxShield() { ensureCtx(); if (sfxGain) playNote(500, 'triangle', 0.15, sfxGain, 0.15); },
+  sfxShield() {
+    ensureCtx();
+    if (sfxGain) playNote(500, 'triangle', 0.15, sfxGain, 0.15);
+  },
   sfxManaBurst() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(600, 'sine', 0.2, sfxGain, 0.15);
     playNote(900, 'sine', 0.15, sfxGain, 0.12, 0.08);
   },
-  sfxShadow() { ensureCtx(); if (sfxGain) playNote(350, 'square', 0.1, sfxGain, 0.18); },
+  sfxShadow() {
+    ensureCtx();
+    if (sfxGain) playNote(350, 'square', 0.1, sfxGain, 0.18);
+  },
   sfxIce() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(1400, 'sine', 0.12, sfxGain, 0.12);
     playNote(1800, 'sine', 0.08, sfxGain, 0.1, 0.05);
   },
   sfxLightning() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(100, 'sawtooth', 0.04, sfxGain, 0.25);
     playNote(2200, 'square', 0.06, sfxGain, 0.2, 0.02);
     playNote(600, 'sawtooth', 0.08, sfxGain, 0.12, 0.06);
   },
   sfxBuff() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     [500, 700, 900].forEach((f, i) => playNote(f, 'triangle', 0.15, sfxGain!, 0.1, i * 0.06));
   },
   sfxDebuff() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(300, 'sawtooth', 0.2, sfxGain, 0.12);
     playNote(200, 'sawtooth', 0.15, sfxGain, 0.1, 0.08);
   },
   sfxStealth() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(800, 'sine', 0.2, sfxGain, 0.06);
     playNote(600, 'sine', 0.15, sfxGain, 0.04, 0.1);
   },
   sfxLevelUp() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     [440, 554, 659, 880].forEach((f, i) => playNote(f, 'sine', 0.2, sfxGain!, 0.12, i * 0.08));
   },
   sfxPotion() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(600, 'sine', 0.15, sfxGain, 0.1);
     playNote(800, 'sine', 0.1, sfxGain, 0.08, 0.08);
   },
   sfxBossWarning() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(80, 'sawtooth', 0.8, sfxGain, 0.2);
     playNote(75, 'square', 0.6, sfxGain, 0.15, 0.3);
   },
   sfxCardSelect() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(1200, 'triangle', 0.04, sfxGain, 0.1);
     playNote(1600, 'triangle', 0.03, sfxGain, 0.08, 0.03);
   },
   sfxAchievement() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     [660, 880, 1100, 1320].forEach((f, i) => playNote(f, 'triangle', 0.2, sfxGain!, 0.1, i * 0.1));
   },
-  sfxGold() { ensureCtx(); if (sfxGain) playNote(2000, 'triangle', 0.05, sfxGain, 0.08); },
+  sfxGold() {
+    ensureCtx();
+    if (sfxGain) playNote(2000, 'triangle', 0.05, sfxGain, 0.08);
+  },
   sfxGameOver() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     [220, 196, 165, 131].forEach((f, i) => playNote(f, 'sine', 0.5, sfxGain!, 0.12, i * 0.3));
   },
-  sfxClick() { ensureCtx(); if (sfxGain) playNote(1000, 'triangle', 0.03, sfxGain, 0.08); },
+  sfxClick() {
+    ensureCtx();
+    if (sfxGain) playNote(1000, 'triangle', 0.03, sfxGain, 0.08);
+  },
 
   sfxPlayerHit() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(120, 'sawtooth', 0.12, sfxGain, 0.2);
     playNote(80, 'square', 0.08, sfxGain, 0.15, 0.04);
   },
   sfxBossHit() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(70, 'sawtooth', 0.2, sfxGain, 0.25);
     playNote(50, 'square', 0.15, sfxGain, 0.2, 0.06);
     playNote(90, 'sawtooth', 0.1, sfxGain, 0.12, 0.12);
   },
   sfxHeartbeat() {
-    ensureCtx(); if (!sfxGain) return;
+    ensureCtx();
+    if (!sfxGain) return;
     playNote(55, 'sine', 0.12, sfxGain, 0.2);
     playNote(55, 'sine', 0.1, sfxGain, 0.18, 0.18);
   },
