@@ -70,6 +70,11 @@ import {
   SYNERGIES,
   AUTO_ATK_CARDS,
 } from '../config/cardData';
+import { BattleSystem } from '../systems/BattleSystem';
+import { StageManager } from '../systems/StageManager';
+import { CardSystem } from '../systems/CardSystem';
+import { UIManager } from '../ui/UIManager';
+import { OverlayManager } from '../ui/OverlayManager';
 
 function cv(base: number, level: number): number {
   return level <= 0 ? 0 : base * level;
@@ -98,6 +103,14 @@ function skillCdCalc(id: string, level: number, cdReduction: number): number {
 /* ================================================================ */
 
 export class GameScene extends Phaser.Scene {
+  /* ---- systems ---- */
+
+  private battleSystem!: BattleSystem;
+  private stageManager!: StageManager;
+  private cardSystem!: CardSystem;
+  private uiManager!: UIManager;
+  private overlayManager!: OverlayManager;
+
   /* ---- state ---- */
 
   private gold = 0;
@@ -504,6 +517,12 @@ export class GameScene extends Phaser.Scene {
      ================================================================ */
 
   create() {
+    this.battleSystem = new BattleSystem(this);
+    this.stageManager = new StageManager(this);
+    this.cardSystem = new CardSystem(this);
+    this.uiManager = new UIManager(this);
+    this.overlayManager = new OverlayManager(this);
+
     const isResume = this.loadingRun;
     this.resetState();
 
