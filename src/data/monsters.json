@@ -1,0 +1,7 @@
+[
+  { "name": "슬라임",    "baseHp": 10,  "gold": 5,   "type": "slime",    "size": 55 },
+  { "name": "스켈레톤",  "baseHp": 30,  "gold": 15,  "type": "skeleton", "size": 60 },
+  { "name": "오크",      "baseHp": 70,  "gold": 35,  "type": "orc",      "size": 70 },
+  { "name": "드래곤",    "baseHp": 150, "gold": 80,  "type": "dragon",   "size": 80 },
+  { "name": "마왕",      "baseHp": 300, "gold": 200, "type": "boss",     "size": 90 }
+]
