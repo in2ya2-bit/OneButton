@@ -735,118 +735,18 @@ export class UIManager {
   }
 
   createOverdriveGauge(): void {
-    const gx = 650,
-      gy = 517,
-      gw = 110,
-      gh = 10;
-    this.overdriveGaugeBg = this.ctx.add.graphics().setDepth(48);
-    this.overdriveGaugeBg.fillStyle(0x111122, 0.7);
-    this.overdriveGaugeBg.fillRoundedRect(gx, gy, gw, gh, 4);
-    this.overdriveGaugeBg.lineStyle(1, 0x554400, 0.5);
-    this.overdriveGaugeBg.strokeRoundedRect(gx, gy, gw, gh, 4);
-    this.overdriveGaugeFill = this.ctx.add.graphics().setDepth(49);
-    this.overdriveGaugeText = this.ctx.add
-      .text(gx + gw / 2, gy - 1, 'OD 0%', {
-        fontSize: '8px',
-        color: '#ffaa00',
-        fontFamily: 'Arial',
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 2,
-      })
-      .setOrigin(0.5, 1)
-      .setDepth(50);
-    this.ctx.battleSystem.odReadyText = this.ctx.add
-      .text(gx + gw / 2, gy + gh + 2, '', {
-        fontSize: '10px',
-        color: '#ffdd00',
-        fontFamily: 'Arial',
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 3,
-      })
-      .setOrigin(0.5, 0)
-      .setDepth(50)
-      .setAlpha(0);
-
-    const odZone = this.ctx.add
-      .zone(gx + gw / 2, gy + gh / 2, gw, gh + 12)
-      .setInteractive()
-      .setDepth(55);
-    odZone.on('pointerdown', () => this.ctx.battleSystem.tryActivateOverdrive());
-
-    this.drawOverdriveGauge();
+    this.overdriveGaugeBg = this.ctx.add.graphics().setDepth(48).setVisible(false);
+    this.overdriveGaugeFill = this.ctx.add.graphics().setDepth(49).setVisible(false);
+    this.overdriveGaugeText = this.ctx.add.text(0, 0, '').setVisible(false).setDepth(50);
+    this.ctx.battleSystem.odReadyText = this.ctx.add.text(0, 0, '').setVisible(false).setDepth(50);
   }
 
   private getOdColor(): number {
-    if (this.ctx.battleSystem.overdriveGauge >= 80) return 0xffcc00;
-    if (this.ctx.battleSystem.overdriveGauge >= 50) return 0xaa44ff;
     return 0x3388ff;
   }
 
   drawOverdriveGauge(): void {
-    if (!this.overdriveGaugeFill || !this.overdriveGaugeText) return;
-    const gx = 650,
-      gy = 517,
-      gw = 110,
-      gh = 10;
-    this.overdriveGaugeFill.clear();
-    const ratio = Phaser.Math.Clamp(this.ctx.battleSystem.overdriveGauge / 100, 0, 1);
-    if (ratio > 0) {
-      this.overdriveGaugeFill.fillStyle(this.getOdColor(), 0.9);
-      this.overdriveGaugeFill.fillRoundedRect(gx, gy, gw * ratio, gh, 4);
-    }
-    if (this.ctx.battleSystem.overdriveActive) {
-      this.overdriveGaugeText.setText('⚡ OVERDRIVE ⚡');
-      this.overdriveGaugeText.setColor('#ffdd00');
-    } else {
-      this.overdriveGaugeText.setText(`OD ${Math.floor(this.ctx.battleSystem.overdriveGauge)}%`);
-      this.overdriveGaugeText.setColor(
-        this.ctx.battleSystem.overdriveGauge >= 80 ? '#ffdd00' : '#ffaa00',
-      );
-    }
-
-    if (!this.ctx.battleSystem.overdriveActive && this.ctx.battleSystem.odReadyText) {
-      if (this.ctx.battleSystem.overdriveGauge >= 100) {
-        this.ctx.battleSystem.odReadyText.setText('OVERDRIVE! [Enter]').setAlpha(1);
-        if (
-          !this.ctx.battleSystem.odPulseTween ||
-          !this.ctx.battleSystem.odPulseTween.isPlaying()
-        ) {
-          this.ctx.battleSystem.odPulseTween = this.ctx.tweens.add({
-            targets: [this.ctx.battleSystem.odReadyText, this.overdriveGaugeFill],
-            alpha: 0.4,
-            duration: 300,
-            yoyo: true,
-            repeat: -1,
-          });
-        }
-      } else if (this.ctx.battleSystem.overdriveGauge >= 80) {
-        this.ctx.battleSystem.odReadyText.setText('OVERDRIVE 준비!').setAlpha(1);
-        if (
-          !this.ctx.battleSystem.odPulseTween ||
-          !this.ctx.battleSystem.odPulseTween.isPlaying()
-        ) {
-          this.ctx.battleSystem.odPulseTween = this.ctx.tweens.add({
-            targets: this.overdriveGaugeFill,
-            alpha: 0.5,
-            duration: 500,
-            yoyo: true,
-            repeat: -1,
-          });
-        }
-      } else if (this.ctx.battleSystem.overdriveGauge >= 50) {
-        this.ctx.battleSystem.odPulseTween?.stop();
-        this.ctx.battleSystem.odPulseTween = undefined;
-        this.overdriveGaugeFill?.setAlpha(1);
-        this.ctx.battleSystem.odReadyText.setAlpha(0);
-      } else {
-        this.ctx.battleSystem.odPulseTween?.stop();
-        this.ctx.battleSystem.odPulseTween = undefined;
-        this.overdriveGaugeFill?.setAlpha(1);
-        this.ctx.battleSystem.odReadyText.setAlpha(0);
-      }
-    }
+    // OD gauge hidden
   }
 
   createEmergencyDefBtn(): void {
