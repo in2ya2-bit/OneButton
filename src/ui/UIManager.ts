@@ -132,6 +132,12 @@ export class UIManager {
   }
 
   reset(): void {
+    this.playerHpBg?.destroy();
+    this.playerHpFill?.destroy();
+    this.playerHpText?.destroy();
+    this.playerMpFill?.destroy();
+    this.playerMpText?.destroy();
+
     this.emptySlotGfx = [];
     this.skillButtons = [];
     this.qSlotBgs = [];
@@ -365,6 +371,12 @@ export class UIManager {
   }
 
   createPlayerHpBar(): void {
+    this.playerHpBg?.destroy();
+    this.playerHpFill?.destroy();
+    this.playerHpText?.destroy();
+    this.playerMpFill?.destroy();
+    this.playerMpText?.destroy();
+
     const { x, y, w, h } = HP_BAR;
     this.playerHpBg = this.ctx.add.graphics().setDepth(50);
     this.playerHpBg.fillStyle(0x000000, 0.6);
