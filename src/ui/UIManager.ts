@@ -250,9 +250,9 @@ export class UIManager {
       .setDepth(50);
 
     const playerCharBg = this.ctx.add.graphics().setDepth(49);
-    playerCharBg.fillStyle(this.ctx.selectedClass.color, 0.15);
+    playerCharBg.fillStyle(this.ctx.selectedClass.color, 0.2);
     playerCharBg.fillCircle(PLAYER_POS.x, PLAYER_POS.y, 30);
-    playerCharBg.lineStyle(2, this.ctx.selectedClass.borderColor, 0.5);
+    playerCharBg.lineStyle(2, this.ctx.selectedClass.borderColor, 0.6);
     playerCharBg.strokeCircle(PLAYER_POS.x, PLAYER_POS.y, 30);
 
     this.ctx.add
