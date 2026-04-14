@@ -156,7 +156,7 @@ export class UIManager {
       .setDepth(50);
 
     this.waveText = this.ctx.add
-      .text(400, 28, '', {
+      .text(400, 34, '', {
         fontSize: '13px',
         color: '#99aacc',
         fontFamily: 'Arial, sans-serif',
@@ -210,7 +210,8 @@ export class UIManager {
         stroke: '#000000',
         strokeThickness: 3,
       })
-      .setDepth(50);
+      .setDepth(50)
+      .setVisible(false);
 
     this.bonusText = this.ctx.add
       .text(30, 92, '', {
@@ -220,7 +221,8 @@ export class UIManager {
         stroke: '#000000',
         strokeThickness: 2,
       })
-      .setDepth(50);
+      .setDepth(50)
+      .setVisible(false);
 
     this.atkGaugeFill = this.ctx.add.graphics().setDepth(50);
 
@@ -255,7 +257,7 @@ export class UIManager {
 
     this.ctx.add
       .text(PLAYER_POS.x, PLAYER_POS.y - 10, this.ctx.selectedClass.icon, {
-        fontSize: '48px',
+        fontSize: '56px',
       })
       .setOrigin(0.5, 0.5)
       .setDepth(50);

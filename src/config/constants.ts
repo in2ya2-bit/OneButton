@@ -19,9 +19,9 @@ export const MON_ATK_INTERVAL_FINAL = 1500;
 
 export const SHOP_BTN = { x: 330, y: 572, w: 160, h: 36 } as const;
 export const RELIC_BTN = { x: 510, y: 572, w: 160, h: 36 } as const;
-export const HP_BAR = { x: 240, y: 440, w: 320, h: 16 } as const;
-export const MP_BAR = { x: 240, y: 462, w: 320, h: 8 } as const;
-export const XP_BAR = { x: 335, y: 42, w: 130, h: 5 } as const;
+export const HP_BAR = { x: 220, y: 448, w: 360, h: 16 } as const;
+export const MP_BAR = { x: 220, y: 469, w: 360, h: 8 } as const;
+export const XP_BAR = { x: 320, y: 26, w: 160, h: 5 } as const;
 
 export const MAIN_MON_POS = { x: 400, y: 170 };
 export const SUB_MON_POSITIONS = [
@@ -31,7 +31,7 @@ export const SUB_MON_POSITIONS = [
   { x: 500, y: 330 },
 ];
 
-export const PLAYER_POS = { x: 400, y: 400 };
+export const PLAYER_POS = { x: 400, y: 390 };
 
 export const MAX_SLOTS = 4;
 export const SLOT_W = 62;
