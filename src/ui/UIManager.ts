@@ -20,6 +20,7 @@ import {
   QSLOT_H,
   QSLOT_Y,
   QSLOT_XS,
+  PLAYER_POS,
 } from '../config/constants';
 import type { QuickSlotData } from '../types/index';
 import { POTION_DATA } from '../config/cardData';
@@ -155,7 +156,7 @@ export class UIManager {
       .setDepth(50);
 
     this.waveText = this.ctx.add
-      .text(HP_BAR.x + HP_BAR.w / 2, HP_BAR.y + HP_BAR.h + 12, '', {
+      .text(400, 28, '', {
         fontSize: '13px',
         color: '#99aacc',
         fontFamily: 'Arial, sans-serif',
@@ -167,7 +168,7 @@ export class UIManager {
       .setDepth(50);
 
     this.goldText = this.ctx.add
-      .text(30, 68, '', {
+      .text(30, 30, '', {
         fontSize: '20px',
         color: '#ffd700',
         fontFamily: 'Arial, sans-serif',
@@ -178,7 +179,7 @@ export class UIManager {
       .setDepth(50);
 
     this.relicPtsText = this.ctx.add
-      .text(770, 22, '', {
+      .text(770, 30, '', {
         fontSize: '14px',
         color: '#cc88ff',
         fontFamily: 'Arial, sans-serif',
@@ -190,7 +191,7 @@ export class UIManager {
       .setDepth(50);
 
     this.statsLine1 = this.ctx.add
-      .text(30, 94, '', {
+      .text(30, 52, '', {
         fontSize: '18px',
         color: '#ffffff',
         fontFamily: 'Arial, sans-serif',
@@ -201,7 +202,7 @@ export class UIManager {
       .setDepth(50);
 
     this.statsLine2 = this.ctx.add
-      .text(30, 118, '', {
+      .text(30, 72, '', {
         fontSize: '16px',
         color: '#66ccff',
         fontFamily: 'Arial, sans-serif',
@@ -212,7 +213,7 @@ export class UIManager {
       .setDepth(50);
 
     this.bonusText = this.ctx.add
-      .text(30, 142, '', {
+      .text(30, 92, '', {
         fontSize: '14px',
         color: '#aaaaaa',
         fontFamily: 'Arial, sans-serif',
@@ -225,17 +226,17 @@ export class UIManager {
 
     const classIconBg = this.ctx.add.graphics().setDepth(49);
     classIconBg.fillStyle(this.ctx.selectedClass.color, 0.7);
-    classIconBg.fillRoundedRect(726, 38, 44, 44, 8);
+    classIconBg.fillRoundedRect(726, 14, 44, 44, 8);
     classIconBg.lineStyle(2, this.ctx.selectedClass.borderColor, 0.9);
-    classIconBg.strokeRoundedRect(726, 38, 44, 44, 8);
+    classIconBg.strokeRoundedRect(726, 14, 44, 44, 8);
     this.ctx.add
-      .text(748, 52, this.ctx.selectedClass.icon, {
+      .text(748, 28, this.ctx.selectedClass.icon, {
         fontSize: '22px',
       })
       .setOrigin(0.5)
       .setDepth(50);
     this.ctx.add
-      .text(748, 72, this.ctx.selectedClass.name, {
+      .text(748, 48, this.ctx.selectedClass.name, {
         fontSize: '9px',
         color: '#cccccc',
         fontFamily: 'Arial',
@@ -245,6 +246,33 @@ export class UIManager {
       })
       .setOrigin(0.5)
       .setDepth(50);
+
+    const playerCharBg = this.ctx.add.graphics().setDepth(49);
+    playerCharBg.fillStyle(this.ctx.selectedClass.color, 0.15);
+    playerCharBg.fillCircle(PLAYER_POS.x, PLAYER_POS.y - 10, 38);
+    playerCharBg.lineStyle(2, this.ctx.selectedClass.borderColor, 0.5);
+    playerCharBg.strokeCircle(PLAYER_POS.x, PLAYER_POS.y - 10, 38);
+
+    this.ctx.add
+      .text(PLAYER_POS.x, PLAYER_POS.y - 10, this.ctx.selectedClass.icon, {
+        fontSize: '48px',
+      })
+      .setOrigin(0.5, 0.5)
+      .setDepth(50);
+
+    this.ctx.add
+      .text(HP_BAR.x - 8, HP_BAR.y + HP_BAR.h / 2, '❤️', {
+        fontSize: '13px',
+      })
+      .setOrigin(1, 0.5)
+      .setDepth(51);
+
+    this.ctx.add
+      .text(MP_BAR.x - 8, MP_BAR.y + MP_BAR.h / 2, '💎', {
+        fontSize: '13px',
+      })
+      .setOrigin(1, 0.5)
+      .setDepth(51);
 
     this.createMarkDisplay();
     this.updateUI();
@@ -803,10 +831,10 @@ export class UIManager {
   }
 
   createOverdriveGauge(): void {
-    const gx = 280,
-      gy = SLOT_Y - 52,
-      gw = 240,
-      gh = 10;
+    const gx = 620,
+      gy = 508,
+      gw = 150,
+      gh = 14;
     this.overdriveGaugeBg = this.ctx.add.graphics().setDepth(48);
     this.overdriveGaugeBg.fillStyle(0x111122, 0.7);
     this.overdriveGaugeBg.fillRoundedRect(gx, gy, gw, gh, 4);
@@ -854,10 +882,10 @@ export class UIManager {
 
   drawOverdriveGauge(): void {
     if (!this.overdriveGaugeFill || !this.overdriveGaugeText) return;
-    const gx = 280,
-      gy = SLOT_Y - 52,
-      gw = 240,
-      gh = 10;
+    const gx = 620,
+      gy = 508,
+      gw = 150,
+      gh = 14;
     this.overdriveGaugeFill.clear();
     const ratio = Phaser.Math.Clamp(this.ctx.battleSystem.overdriveGauge / 100, 0, 1);
     if (ratio > 0) {

@@ -17,24 +17,26 @@ export const MON_ATK_INTERVAL_FINAL = 1500;
 
 /* ---- layout constants ---- */
 
-export const SHOP_BTN = { x: 330, y: 560, w: 160, h: 36 } as const;
-export const RELIC_BTN = { x: 510, y: 560, w: 160, h: 36 } as const;
-export const HP_BAR = { x: 535, y: 62, w: 235, h: 18 } as const;
-export const MP_BAR = { x: 535, y: 86, w: 235, h: 10 } as const;
+export const SHOP_BTN = { x: 330, y: 572, w: 160, h: 36 } as const;
+export const RELIC_BTN = { x: 510, y: 572, w: 160, h: 36 } as const;
+export const HP_BAR = { x: 240, y: 440, w: 320, h: 16 } as const;
+export const MP_BAR = { x: 240, y: 462, w: 320, h: 8 } as const;
 export const XP_BAR = { x: 335, y: 42, w: 130, h: 5 } as const;
 
-export const MAIN_MON_POS = { x: 400, y: 230 };
+export const MAIN_MON_POS = { x: 400, y: 170 };
 export const SUB_MON_POSITIONS = [
-  { x: 200, y: 360 },
-  { x: 600, y: 360 },
-  { x: 300, y: 395 },
-  { x: 500, y: 395 },
+  { x: 200, y: 300 },
+  { x: 600, y: 300 },
+  { x: 300, y: 330 },
+  { x: 500, y: 330 },
 ];
+
+export const PLAYER_POS = { x: 400, y: 400 };
 
 export const MAX_SLOTS = 4;
 export const SLOT_W = 62;
 export const SLOT_H = 55;
-export const SLOT_Y = 478;
+export const SLOT_Y = 510;
 export const SLOT_XS = Array.from({ length: MAX_SLOTS }, (_, i) => 270 + i * 68);
 
 export const QSLOT_W = 52;
