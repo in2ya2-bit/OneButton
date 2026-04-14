@@ -132,12 +132,6 @@ export class UIManager {
   }
 
   reset(): void {
-    this.playerHpBg?.destroy();
-    this.playerHpFill?.destroy();
-    this.playerHpText?.destroy();
-    this.playerMpFill?.destroy();
-    this.playerMpText?.destroy();
-
     this.emptySlotGfx = [];
     this.skillButtons = [];
     this.qSlotBgs = [];
@@ -162,7 +156,7 @@ export class UIManager {
       .setDepth(50);
 
     this.waveText = this.ctx.add
-      .text(400, 46, '', {
+      .text(HP_BAR.x + HP_BAR.w / 2, HP_BAR.y + HP_BAR.h + 12, '', {
         fontSize: '13px',
         color: '#99aacc',
         fontFamily: 'Arial, sans-serif',
@@ -174,7 +168,7 @@ export class UIManager {
       .setDepth(50);
 
     this.goldText = this.ctx.add
-      .text(12, 58, '', {
+      .text(30, 68, '', {
         fontSize: '20px',
         color: '#ffd700',
         fontFamily: 'Arial, sans-serif',
@@ -185,7 +179,7 @@ export class UIManager {
       .setDepth(50);
 
     this.relicPtsText = this.ctx.add
-      .text(770, 30, '', {
+      .text(770, 22, '', {
         fontSize: '14px',
         color: '#cc88ff',
         fontFamily: 'Arial, sans-serif',
@@ -197,7 +191,7 @@ export class UIManager {
       .setDepth(50);
 
     this.statsLine1 = this.ctx.add
-      .text(12, 80, '', {
+      .text(30, 94, '', {
         fontSize: '18px',
         color: '#ffffff',
         fontFamily: 'Arial, sans-serif',
@@ -208,7 +202,7 @@ export class UIManager {
       .setDepth(50);
 
     this.statsLine2 = this.ctx.add
-      .text(30, 72, '', {
+      .text(30, 118, '', {
         fontSize: '16px',
         color: '#66ccff',
         fontFamily: 'Arial, sans-serif',
@@ -216,35 +210,33 @@ export class UIManager {
         stroke: '#000000',
         strokeThickness: 3,
       })
-      .setDepth(50)
-      .setVisible(false);
+      .setDepth(50);
 
     this.bonusText = this.ctx.add
-      .text(30, 92, '', {
+      .text(30, 142, '', {
         fontSize: '14px',
         color: '#aaaaaa',
         fontFamily: 'Arial, sans-serif',
         stroke: '#000000',
         strokeThickness: 2,
       })
-      .setDepth(50)
-      .setVisible(false);
+      .setDepth(50);
 
     this.atkGaugeFill = this.ctx.add.graphics().setDepth(50);
 
     const classIconBg = this.ctx.add.graphics().setDepth(49);
     classIconBg.fillStyle(this.ctx.selectedClass.color, 0.7);
-    classIconBg.fillRoundedRect(736, 8, 40, 40, 8);
+    classIconBg.fillRoundedRect(726, 38, 44, 44, 8);
     classIconBg.lineStyle(2, this.ctx.selectedClass.borderColor, 0.9);
-    classIconBg.strokeRoundedRect(736, 8, 40, 40, 8);
+    classIconBg.strokeRoundedRect(726, 38, 44, 44, 8);
     this.ctx.add
-      .text(756, 22, this.ctx.selectedClass.icon, {
+      .text(748, 52, this.ctx.selectedClass.icon, {
         fontSize: '22px',
       })
       .setOrigin(0.5)
       .setDepth(50);
     this.ctx.add
-      .text(756, 42, this.ctx.selectedClass.name, {
+      .text(748, 72, this.ctx.selectedClass.name, {
         fontSize: '9px',
         color: '#cccccc',
         fontFamily: 'Arial',
@@ -260,7 +252,6 @@ export class UIManager {
     playerCharBg.fillCircle(PLAYER_POS.x, PLAYER_POS.y, 30);
     playerCharBg.lineStyle(2, this.ctx.selectedClass.borderColor, 0.6);
     playerCharBg.strokeCircle(PLAYER_POS.x, PLAYER_POS.y, 30);
-
     this.ctx.add
       .text(PLAYER_POS.x, PLAYER_POS.y, this.ctx.selectedClass.icon, {
         fontSize: '44px',
@@ -268,14 +259,6 @@ export class UIManager {
       .setOrigin(0.5, 0.5)
       .setDepth(50);
 
-    this.createXpBar();
-    this.createPlayerHpBar();
-    this.createQuickSlots();
-    this.createSkillSlots();
-    this.createBuffBar();
-    this.createTooltip();
-    this.createResponseButtons();
-    this.createBottomButtons();
     this.createMarkDisplay();
     this.updateUI();
   }
@@ -318,15 +301,15 @@ export class UIManager {
   createXpBar(): void {
     const { x, y, w, h } = XP_BAR;
     this.xpLevelText = this.ctx.add
-      .text(x + w / 2, y + h + 6, '', {
-        fontSize: '10px',
+      .text(x + w / 2, y - 8, '', {
+        fontSize: '11px',
         color: '#88ccff',
         fontFamily: 'Arial, sans-serif',
         fontStyle: 'bold',
         stroke: '#000000',
         strokeThickness: 3,
       })
-      .setOrigin(0.5, 0)
+      .setOrigin(0.5, 0.5)
       .setDepth(52);
     const bg = this.ctx.add.graphics().setDepth(50);
     bg.fillStyle(0x000000, 0.5);
@@ -371,13 +354,16 @@ export class UIManager {
   }
 
   createPlayerHpBar(): void {
-    this.playerHpBg?.destroy();
-    this.playerHpFill?.destroy();
-    this.playerHpText?.destroy();
-    this.playerMpFill?.destroy();
-    this.playerMpText?.destroy();
-
     const { x, y, w, h } = HP_BAR;
+    this.ctx.add
+      .text(x - 28, y + h / 2, '♥', {
+        fontSize: '20px',
+        color: '#ff4444',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(50);
     this.playerHpBg = this.ctx.add.graphics().setDepth(50);
     this.playerHpBg.fillStyle(0x000000, 0.6);
     this.playerHpBg.fillRoundedRect(x - 3, y - 3, w + 6, h + 6, 7);
@@ -397,6 +383,15 @@ export class UIManager {
       .setDepth(52);
 
     const mb = MP_BAR;
+    this.ctx.add
+      .text(mb.x - 28, mb.y + mb.h / 2, '◆', {
+        fontSize: '14px',
+        color: '#4488ff',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(50);
     const mpBg = this.ctx.add.graphics().setDepth(50);
     mpBg.fillStyle(0x000000, 0.6);
     mpBg.fillRoundedRect(mb.x - 2, mb.y - 2, mb.w + 4, mb.h + 4, 5);
@@ -821,9 +816,9 @@ export class UIManager {
   }
 
   createOverdriveGauge(): void {
-    const gx = 650,
-      gy = 517,
-      gw = 110,
+    const gx = 280,
+      gy = SLOT_Y - 52,
+      gw = 240,
       gh = 10;
     this.overdriveGaugeBg = this.ctx.add.graphics().setDepth(48);
     this.overdriveGaugeBg.fillStyle(0x111122, 0.7);
@@ -854,11 +849,13 @@ export class UIManager {
       .setOrigin(0.5, 0)
       .setDepth(50)
       .setAlpha(0);
+
     const odZone = this.ctx.add
       .zone(gx + gw / 2, gy + gh / 2, gw, gh + 12)
       .setInteractive()
       .setDepth(55);
     odZone.on('pointerdown', () => this.ctx.battleSystem.tryActivateOverdrive());
+
     this.drawOverdriveGauge();
   }
 
@@ -870,9 +867,9 @@ export class UIManager {
 
   drawOverdriveGauge(): void {
     if (!this.overdriveGaugeFill || !this.overdriveGaugeText) return;
-    const gx = 650,
-      gy = 517,
-      gw = 110,
+    const gx = 280,
+      gy = SLOT_Y - 52,
+      gw = 240,
       gh = 10;
     this.overdriveGaugeFill.clear();
     const ratio = Phaser.Math.Clamp(this.ctx.battleSystem.overdriveGauge / 100, 0, 1);
@@ -889,18 +886,53 @@ export class UIManager {
         this.ctx.battleSystem.overdriveGauge >= 80 ? '#ffdd00' : '#ffaa00',
       );
     }
+
     if (!this.ctx.battleSystem.overdriveActive && this.ctx.battleSystem.odReadyText) {
       if (this.ctx.battleSystem.overdriveGauge >= 100) {
         this.ctx.battleSystem.odReadyText.setText('OVERDRIVE! [Enter]').setAlpha(1);
+        if (
+          !this.ctx.battleSystem.odPulseTween ||
+          !this.ctx.battleSystem.odPulseTween.isPlaying()
+        ) {
+          this.ctx.battleSystem.odPulseTween = this.ctx.tweens.add({
+            targets: [this.ctx.battleSystem.odReadyText, this.overdriveGaugeFill],
+            alpha: 0.4,
+            duration: 300,
+            yoyo: true,
+            repeat: -1,
+          });
+        }
+      } else if (this.ctx.battleSystem.overdriveGauge >= 80) {
+        this.ctx.battleSystem.odReadyText.setText('OVERDRIVE 준비!').setAlpha(1);
+        if (
+          !this.ctx.battleSystem.odPulseTween ||
+          !this.ctx.battleSystem.odPulseTween.isPlaying()
+        ) {
+          this.ctx.battleSystem.odPulseTween = this.ctx.tweens.add({
+            targets: this.overdriveGaugeFill,
+            alpha: 0.5,
+            duration: 500,
+            yoyo: true,
+            repeat: -1,
+          });
+        }
+      } else if (this.ctx.battleSystem.overdriveGauge >= 50) {
+        this.ctx.battleSystem.odPulseTween?.stop();
+        this.ctx.battleSystem.odPulseTween = undefined;
+        this.overdriveGaugeFill?.setAlpha(1);
+        this.ctx.battleSystem.odReadyText.setAlpha(0);
       } else {
-        this.ctx.battleSystem.odReadyText.setText('').setAlpha(0);
+        this.ctx.battleSystem.odPulseTween?.stop();
+        this.ctx.battleSystem.odPulseTween = undefined;
+        this.overdriveGaugeFill?.setAlpha(1);
+        this.ctx.battleSystem.odReadyText.setAlpha(0);
       }
     }
   }
 
   createEmergencyDefBtn(): void {
-    const bx = HP_BAR.x + HP_BAR.w + 30,
-      by = HP_BAR.y + 7;
+    const bx = HP_BAR.x + HP_BAR.w + 36,
+      by = HP_BAR.y + 10;
     const bw = 42,
       bh = 38;
     const container = this.ctx.add.container(bx, by).setDepth(52);
@@ -1124,6 +1156,73 @@ export class UIManager {
   updateBuffBar(): void {
     if (!this.buffBarContainer) return;
     this.buffBarContainer.removeAll(true);
+
+    const by = SLOT_Y + SLOT_H / 2 + 14;
+
+    const stats: { icon: string; label: string; value: string; color: string }[] = [
+      {
+        icon: '❤️',
+        label: 'HP',
+        value: `${Math.ceil(this.ctx.playerHp)}/${this.ctx.playerMaxHp}`,
+        color: '#ff6666',
+      },
+      {
+        icon: '💎',
+        label: 'MP',
+        value: `${Math.ceil(this.ctx.playerMp)}/${this.ctx.playerMaxMp}`,
+        color: '#4488ff',
+      },
+      { icon: '⚔️', label: 'ATK', value: `${this.ctx.effectiveAtk}`, color: '#ff8844' },
+      {
+        icon: '💨',
+        label: 'SPD',
+        value: `${this.ctx.attacksPerSec.toFixed(2)}/s`,
+        color: '#66ccff',
+      },
+      {
+        icon: '🛡️',
+        label: 'DEF',
+        value: `${Math.floor(this.ctx.defenseRate * 100)}%`,
+        color: '#4488cc',
+      },
+      {
+        icon: '🎯',
+        label: 'CRIT',
+        value: `${Math.floor(this.ctx.critChance * 100)}%`,
+        color: '#ffaa00',
+      },
+      {
+        icon: '🩸',
+        label: '흡혈',
+        value: `${(this.ctx.lifestealRate * 100).toFixed(1)}%`,
+        color: '#cc4488',
+      },
+    ];
+
+    const gap = 6;
+    const itemW = 110;
+    const totalW = stats.length * itemW + (stats.length - 1) * gap;
+    const startX = 400 - totalW / 2;
+
+    const panelBg = this.ctx.add.graphics();
+    panelBg.fillStyle(0x0a0a18, 0.7);
+    panelBg.fillRoundedRect(startX - 8, by - 10, totalW + 16, 22, 6);
+    this.buffBarContainer.add(panelBg);
+
+    stats.forEach((s, i) => {
+      const sx = startX + i * (itemW + gap);
+      const txt = this.ctx.add
+        .text(sx, by, `${s.icon} ${s.label} ${s.value}`, {
+          fontSize: '10px',
+          color: s.color,
+          fontFamily: 'Arial',
+          fontStyle: 'bold',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setDepth(53);
+      this.buffBarContainer!.add(txt);
+    });
   }
 
   drawAtkGauge(ratio: number): void {
