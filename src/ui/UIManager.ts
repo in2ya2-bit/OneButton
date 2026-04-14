@@ -156,7 +156,7 @@ export class UIManager {
       .setDepth(50);
 
     this.waveText = this.ctx.add
-      .text(400, 42, '', {
+      .text(400, 46, '', {
         fontSize: '13px',
         color: '#99aacc',
         fontFamily: 'Arial, sans-serif',
@@ -168,7 +168,7 @@ export class UIManager {
       .setDepth(50);
 
     this.goldText = this.ctx.add
-      .text(10, 75, '', {
+      .text(12, 58, '', {
         fontSize: '20px',
         color: '#ffd700',
         fontFamily: 'Arial, sans-serif',
@@ -191,7 +191,7 @@ export class UIManager {
       .setDepth(50);
 
     this.statsLine1 = this.ctx.add
-      .text(10, 98, '', {
+      .text(12, 80, '', {
         fontSize: '18px',
         color: '#ffffff',
         fontFamily: 'Arial, sans-serif',
@@ -228,17 +228,17 @@ export class UIManager {
 
     const classIconBg = this.ctx.add.graphics().setDepth(49);
     classIconBg.fillStyle(this.ctx.selectedClass.color, 0.7);
-    classIconBg.fillRoundedRect(726, 14, 44, 44, 8);
+    classIconBg.fillRoundedRect(736, 8, 40, 40, 8);
     classIconBg.lineStyle(2, this.ctx.selectedClass.borderColor, 0.9);
-    classIconBg.strokeRoundedRect(726, 14, 44, 44, 8);
+    classIconBg.strokeRoundedRect(736, 8, 40, 40, 8);
     this.ctx.add
-      .text(748, 28, this.ctx.selectedClass.icon, {
+      .text(756, 22, this.ctx.selectedClass.icon, {
         fontSize: '22px',
       })
       .setOrigin(0.5)
       .setDepth(50);
     this.ctx.add
-      .text(748, 48, this.ctx.selectedClass.name, {
+      .text(756, 42, this.ctx.selectedClass.name, {
         fontSize: '9px',
         color: '#cccccc',
         fontFamily: 'Arial',
@@ -251,19 +251,19 @@ export class UIManager {
 
     const playerCharBg = this.ctx.add.graphics().setDepth(49);
     playerCharBg.fillStyle(this.ctx.selectedClass.color, 0.15);
-    playerCharBg.fillCircle(PLAYER_POS.x, PLAYER_POS.y - 10, 38);
+    playerCharBg.fillCircle(PLAYER_POS.x, PLAYER_POS.y, 30);
     playerCharBg.lineStyle(2, this.ctx.selectedClass.borderColor, 0.5);
-    playerCharBg.strokeCircle(PLAYER_POS.x, PLAYER_POS.y - 10, 38);
+    playerCharBg.strokeCircle(PLAYER_POS.x, PLAYER_POS.y, 30);
 
     this.ctx.add
-      .text(PLAYER_POS.x, PLAYER_POS.y - 10, this.ctx.selectedClass.icon, {
-        fontSize: '56px',
+      .text(PLAYER_POS.x, PLAYER_POS.y, this.ctx.selectedClass.icon, {
+        fontSize: '44px',
       })
       .setOrigin(0.5, 0.5)
       .setDepth(50);
 
     this.ctx.add
-      .text(HP_BAR.x - 8, HP_BAR.y + HP_BAR.h / 2, '❤️', {
+      .text(HP_BAR.x - 10, HP_BAR.y + HP_BAR.h / 2, '❤️', {
         fontSize: '13px',
       })
       .setOrigin(1, 0.5)
@@ -833,10 +833,10 @@ export class UIManager {
   }
 
   createOverdriveGauge(): void {
-    const gx = 640,
-      gy = 520,
-      gw = 120,
-      gh = 12;
+    const gx = 650,
+      gy = 517,
+      gw = 110,
+      gh = 10;
     this.overdriveGaugeBg = this.ctx.add.graphics().setDepth(48);
     this.overdriveGaugeBg.fillStyle(0x111122, 0.7);
     this.overdriveGaugeBg.fillRoundedRect(gx, gy, gw, gh, 4);
@@ -884,10 +884,10 @@ export class UIManager {
 
   drawOverdriveGauge(): void {
     if (!this.overdriveGaugeFill || !this.overdriveGaugeText) return;
-    const gx = 640,
-      gy = 520,
-      gw = 120,
-      gh = 12;
+    const gx = 650,
+      gy = 517,
+      gw = 110,
+      gh = 10;
     this.overdriveGaugeFill.clear();
     const ratio = Phaser.Math.Clamp(this.ctx.battleSystem.overdriveGauge / 100, 0, 1);
     if (ratio > 0) {
@@ -948,8 +948,8 @@ export class UIManager {
   }
 
   createEmergencyDefBtn(): void {
-    const bx = HP_BAR.x + HP_BAR.w + 36,
-      by = HP_BAR.y + 10;
+    const bx = HP_BAR.x + HP_BAR.w + 30,
+      by = HP_BAR.y + 7;
     const bw = 42,
       bh = 38;
     const container = this.ctx.add.container(bx, by).setDepth(52);
