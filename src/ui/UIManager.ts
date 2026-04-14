@@ -262,20 +262,6 @@ export class UIManager {
       .setOrigin(0.5, 0.5)
       .setDepth(50);
 
-    this.ctx.add
-      .text(HP_BAR.x - 10, HP_BAR.y + HP_BAR.h / 2, '❤️', {
-        fontSize: '13px',
-      })
-      .setOrigin(1, 0.5)
-      .setDepth(51);
-
-    this.ctx.add
-      .text(MP_BAR.x - 8, MP_BAR.y + MP_BAR.h / 2, '💎', {
-        fontSize: '13px',
-      })
-      .setOrigin(1, 0.5)
-      .setDepth(51);
-
     this.createMarkDisplay();
     this.updateUI();
   }
@@ -371,92 +357,19 @@ export class UIManager {
   }
 
   createPlayerHpBar(): void {
-    const { x, y, w, h } = HP_BAR;
-    this.ctx.add
-      .text(x - 28, y + h / 2, '♥', {
-        fontSize: '20px',
-        color: '#ff4444',
-        stroke: '#000000',
-        strokeThickness: 2,
-      })
-      .setOrigin(0.5)
-      .setDepth(50);
-    this.playerHpBg = this.ctx.add.graphics().setDepth(50);
-    this.playerHpBg.fillStyle(0x000000, 0.6);
-    this.playerHpBg.fillRoundedRect(x - 3, y - 3, w + 6, h + 6, 7);
-    this.playerHpBg.fillStyle(0x331111, 1);
-    this.playerHpBg.fillRoundedRect(x, y, w, h, 5);
-    this.playerHpFill = this.ctx.add.graphics().setDepth(51);
-    this.playerHpText = this.ctx.add
-      .text(x + w / 2, y + h / 2, '', {
-        fontSize: '11px',
-        color: '#ffffff',
-        fontFamily: 'Arial',
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 2,
-      })
-      .setOrigin(0.5)
-      .setDepth(52);
-
-    const mb = MP_BAR;
-    this.ctx.add
-      .text(mb.x - 28, mb.y + mb.h / 2, '◆', {
-        fontSize: '14px',
-        color: '#4488ff',
-        stroke: '#000000',
-        strokeThickness: 2,
-      })
-      .setOrigin(0.5)
-      .setDepth(50);
-    const mpBg = this.ctx.add.graphics().setDepth(50);
-    mpBg.fillStyle(0x000000, 0.6);
-    mpBg.fillRoundedRect(mb.x - 2, mb.y - 2, mb.w + 4, mb.h + 4, 5);
-    mpBg.fillStyle(0x111133, 1);
-    mpBg.fillRoundedRect(mb.x, mb.y, mb.w, mb.h, 4);
-    this.playerMpFill = this.ctx.add.graphics().setDepth(51);
-    this.playerMpText = this.ctx.add
-      .text(mb.x + mb.w / 2, mb.y + mb.h / 2, '', {
-        fontSize: '8px',
-        color: '#aaddff',
-        fontFamily: 'Arial',
-        fontStyle: 'bold',
-        stroke: '#000000',
-        strokeThickness: 1,
-      })
-      .setOrigin(0.5)
-      .setDepth(52);
-
-    this.drawPlayerHpBar();
-    this.drawMpBar();
+    this.playerHpBg = this.ctx.add.graphics().setDepth(50).setVisible(false);
+    this.playerHpFill = this.ctx.add.graphics().setDepth(51).setVisible(false);
+    this.playerHpText = this.ctx.add.text(0, 0, '').setVisible(false).setDepth(52);
+    this.playerMpFill = this.ctx.add.graphics().setDepth(51).setVisible(false);
+    this.playerMpText = this.ctx.add.text(0, 0, '').setVisible(false).setDepth(52);
   }
 
   drawPlayerHpBar(): void {
-    const { x, y, w, h } = HP_BAR;
-    const ratio = Phaser.Math.Clamp(this.ctx.playerHp / this.ctx.playerMaxHp, 0, 1);
-    const fw = w * ratio;
-    this.playerHpFill.clear();
-    if (fw > 0) {
-      const r = 160 + Math.floor(70 * ratio);
-      const g = Math.floor(50 * ratio);
-      this.playerHpFill.fillStyle((r << 16) | (g << 8) | 0x20, 1);
-      this.playerHpFill.fillRoundedRect(x, y, fw, h, Math.min(5, fw / 2));
-    }
-    this.playerHpText.setText(
-      `${Math.max(0, Math.ceil(this.ctx.playerHp))} / ${this.ctx.playerMaxHp}`,
-    );
+    // HP bar hidden
   }
 
   drawMpBar(): void {
-    const { x, y, w, h } = MP_BAR;
-    const ratio = Phaser.Math.Clamp(this.ctx.playerMp / this.ctx.playerMaxMp, 0, 1);
-    const fw = w * ratio;
-    this.playerMpFill.clear();
-    if (fw > 0) {
-      this.playerMpFill.fillStyle(0x2266dd, 1);
-      this.playerMpFill.fillRoundedRect(x, y, fw, h, Math.min(4, fw / 2));
-    }
-    this.playerMpText.setText(`${Math.ceil(this.ctx.playerMp)} / ${this.ctx.playerMaxMp}`);
+    // MP bar hidden
   }
 
   refreshSkillButtonStates(): void {
@@ -500,18 +413,7 @@ export class UIManager {
   }
 
   flashMpBar(): void {
-    const { x, y, w, h } = MP_BAR;
-    const flash = this.ctx.add.graphics().setDepth(100);
-    flash.fillStyle(0xff2222, 0.6);
-    flash.fillRoundedRect(x, y, w, h, 4);
-    this.ctx.tweens.add({
-      targets: flash,
-      alpha: 0,
-      duration: 400,
-      yoyo: true,
-      repeat: 1,
-      onComplete: () => flash.destroy(),
-    });
+    // MP bar hidden
   }
 
   checkLowMpWarning(): void {
