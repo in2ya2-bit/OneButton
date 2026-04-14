@@ -156,7 +156,7 @@ export class UIManager {
       .setDepth(50);
 
     this.waveText = this.ctx.add
-      .text(400, 34, '', {
+      .text(400, 42, '', {
         fontSize: '13px',
         color: '#99aacc',
         fontFamily: 'Arial, sans-serif',
@@ -168,7 +168,7 @@ export class UIManager {
       .setDepth(50);
 
     this.goldText = this.ctx.add
-      .text(30, 30, '', {
+      .text(10, 75, '', {
         fontSize: '20px',
         color: '#ffd700',
         fontFamily: 'Arial, sans-serif',
@@ -191,7 +191,7 @@ export class UIManager {
       .setDepth(50);
 
     this.statsLine1 = this.ctx.add
-      .text(30, 52, '', {
+      .text(10, 98, '', {
         fontSize: '18px',
         color: '#ffffff',
         fontFamily: 'Arial, sans-serif',
@@ -833,10 +833,10 @@ export class UIManager {
   }
 
   createOverdriveGauge(): void {
-    const gx = 620,
-      gy = 508,
-      gw = 150,
-      gh = 14;
+    const gx = 640,
+      gy = 520,
+      gw = 120,
+      gh = 12;
     this.overdriveGaugeBg = this.ctx.add.graphics().setDepth(48);
     this.overdriveGaugeBg.fillStyle(0x111122, 0.7);
     this.overdriveGaugeBg.fillRoundedRect(gx, gy, gw, gh, 4);
@@ -884,10 +884,10 @@ export class UIManager {
 
   drawOverdriveGauge(): void {
     if (!this.overdriveGaugeFill || !this.overdriveGaugeText) return;
-    const gx = 620,
-      gy = 508,
-      gw = 150,
-      gh = 14;
+    const gx = 640,
+      gy = 520,
+      gw = 120,
+      gh = 12;
     this.overdriveGaugeFill.clear();
     const ratio = Phaser.Math.Clamp(this.ctx.battleSystem.overdriveGauge / 100, 0, 1);
     if (ratio > 0) {
