@@ -205,8 +205,6 @@ function drawOrc(b: BlockFn) {
   const BR = 0x664422,
     BL = 0x886644;
   const T = 0xddddcc,
-    W = 0xffffff,
-    K = 0x111111,
     R = 0xdd3322,
     Y = 0xffcc00;
 
@@ -314,8 +312,6 @@ function drawDragon(b: BlockFn) {
   const Y = 0xffcc00,
     O = 0xff8800,
     BL = 0xffccaa;
-  const K = 0x111111,
-    W = 0xffffff;
 
   // horns
   b(6, 0, D);

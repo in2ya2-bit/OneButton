@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { SaveManager } from '../data/SaveManager';
 import { SoundManager } from '../data/SoundManager';
-import { ACHIEVEMENTS, CATEGORY_LABELS } from '../data/achievements';
+import { ACHIEVEMENTS } from '../data/achievements';
 import { CLASSES } from '../data/classes';
 
 export class TitleScene extends Phaser.Scene {
@@ -362,7 +362,7 @@ export class TitleScene extends Phaser.Scene {
 
   private showSettings() {
     const sEls: Phaser.GameObjects.GameObject[] = [];
-    let settings = SaveManager.loadSettings();
+    const settings = SaveManager.loadSettings();
 
     const bg = this.add.graphics().setDepth(500);
     bg.fillStyle(0x000000, 0.7);
