@@ -156,7 +156,7 @@ export class UIManager {
       .setDepth(50);
 
     this.waveText = this.ctx.add
-      .text(HP_BAR.x + HP_BAR.w / 2, HP_BAR.y + HP_BAR.h + 12, '', {
+      .text(400, 34, '', {
         fontSize: '13px',
         color: '#99aacc',
         fontFamily: 'Arial, sans-serif',
