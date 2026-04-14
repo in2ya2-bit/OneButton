@@ -318,15 +318,15 @@ export class UIManager {
   createXpBar(): void {
     const { x, y, w, h } = XP_BAR;
     this.xpLevelText = this.ctx.add
-      .text(x + w / 2, y - 8, '', {
-        fontSize: '11px',
+      .text(x + w / 2, y + h + 6, '', {
+        fontSize: '10px',
         color: '#88ccff',
         fontFamily: 'Arial, sans-serif',
         fontStyle: 'bold',
         stroke: '#000000',
         strokeThickness: 3,
       })
-      .setOrigin(0.5, 0.5)
+      .setOrigin(0.5, 0)
       .setDepth(52);
     const bg = this.ctx.add.graphics().setDepth(50);
     bg.fillStyle(0x000000, 0.5);
@@ -1173,73 +1173,6 @@ export class UIManager {
   updateBuffBar(): void {
     if (!this.buffBarContainer) return;
     this.buffBarContainer.removeAll(true);
-
-    const by = SLOT_Y + SLOT_H / 2 + 14;
-
-    const stats: { icon: string; label: string; value: string; color: string }[] = [
-      {
-        icon: '❤️',
-        label: 'HP',
-        value: `${Math.ceil(this.ctx.playerHp)}/${this.ctx.playerMaxHp}`,
-        color: '#ff6666',
-      },
-      {
-        icon: '💎',
-        label: 'MP',
-        value: `${Math.ceil(this.ctx.playerMp)}/${this.ctx.playerMaxMp}`,
-        color: '#4488ff',
-      },
-      { icon: '⚔️', label: 'ATK', value: `${this.ctx.effectiveAtk}`, color: '#ff8844' },
-      {
-        icon: '💨',
-        label: 'SPD',
-        value: `${this.ctx.attacksPerSec.toFixed(2)}/s`,
-        color: '#66ccff',
-      },
-      {
-        icon: '🛡️',
-        label: 'DEF',
-        value: `${Math.floor(this.ctx.defenseRate * 100)}%`,
-        color: '#4488cc',
-      },
-      {
-        icon: '🎯',
-        label: 'CRIT',
-        value: `${Math.floor(this.ctx.critChance * 100)}%`,
-        color: '#ffaa00',
-      },
-      {
-        icon: '🩸',
-        label: '흡혈',
-        value: `${(this.ctx.lifestealRate * 100).toFixed(1)}%`,
-        color: '#cc4488',
-      },
-    ];
-
-    const gap = 6;
-    const itemW = 110;
-    const totalW = stats.length * itemW + (stats.length - 1) * gap;
-    const startX = 400 - totalW / 2;
-
-    const panelBg = this.ctx.add.graphics();
-    panelBg.fillStyle(0x0a0a18, 0.7);
-    panelBg.fillRoundedRect(startX - 8, by - 10, totalW + 16, 22, 6);
-    this.buffBarContainer.add(panelBg);
-
-    stats.forEach((s, i) => {
-      const sx = startX + i * (itemW + gap);
-      const txt = this.ctx.add
-        .text(sx, by, `${s.icon} ${s.label} ${s.value}`, {
-          fontSize: '10px',
-          color: s.color,
-          fontFamily: 'Arial',
-          fontStyle: 'bold',
-          stroke: '#000000',
-          strokeThickness: 2,
-        })
-        .setDepth(53);
-      this.buffBarContainer!.add(txt);
-    });
   }
 
   drawAtkGauge(ratio: number): void {
