@@ -312,6 +312,8 @@ function drawDragon(b: BlockFn) {
   const Y = 0xffcc00,
     O = 0xff8800,
     BL = 0xffccaa;
+  const K = 0x111111,
+    W = 0xffffff;
 
   // horns
   b(6, 0, D);
