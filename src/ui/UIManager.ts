@@ -262,6 +262,14 @@ export class UIManager {
       .setOrigin(0.5, 0.5)
       .setDepth(50);
 
+    this.createXpBar();
+    this.createPlayerHpBar();
+    this.createQuickSlots();
+    this.createSkillSlots();
+    this.createBuffBar();
+    this.createTooltip();
+    this.createResponseButtons();
+    this.createBottomButtons();
     this.createMarkDisplay();
     this.updateUI();
   }
@@ -357,19 +365,74 @@ export class UIManager {
   }
 
   createPlayerHpBar(): void {
-    this.playerHpBg = this.ctx.add.graphics().setDepth(50).setVisible(false);
-    this.playerHpFill = this.ctx.add.graphics().setDepth(51).setVisible(false);
-    this.playerHpText = this.ctx.add.text(0, 0, '').setVisible(false).setDepth(52);
-    this.playerMpFill = this.ctx.add.graphics().setDepth(51).setVisible(false);
-    this.playerMpText = this.ctx.add.text(0, 0, '').setVisible(false).setDepth(52);
+    const { x, y, w, h } = HP_BAR;
+    this.playerHpBg = this.ctx.add.graphics().setDepth(50);
+    this.playerHpBg.fillStyle(0x000000, 0.6);
+    this.playerHpBg.fillRoundedRect(x - 3, y - 3, w + 6, h + 6, 7);
+    this.playerHpBg.fillStyle(0x331111, 1);
+    this.playerHpBg.fillRoundedRect(x, y, w, h, 5);
+    this.playerHpFill = this.ctx.add.graphics().setDepth(51);
+    this.playerHpText = this.ctx.add
+      .text(x + w / 2, y + h / 2, '', {
+        fontSize: '11px',
+        color: '#ffffff',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5)
+      .setDepth(52);
+
+    const mb = MP_BAR;
+    const mpBg = this.ctx.add.graphics().setDepth(50);
+    mpBg.fillStyle(0x000000, 0.6);
+    mpBg.fillRoundedRect(mb.x - 2, mb.y - 2, mb.w + 4, mb.h + 4, 5);
+    mpBg.fillStyle(0x111133, 1);
+    mpBg.fillRoundedRect(mb.x, mb.y, mb.w, mb.h, 4);
+    this.playerMpFill = this.ctx.add.graphics().setDepth(51);
+    this.playerMpText = this.ctx.add
+      .text(mb.x + mb.w / 2, mb.y + mb.h / 2, '', {
+        fontSize: '8px',
+        color: '#aaddff',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 1,
+      })
+      .setOrigin(0.5)
+      .setDepth(52);
+
+    this.drawPlayerHpBar();
+    this.drawMpBar();
   }
 
   drawPlayerHpBar(): void {
-    // HP bar hidden
+    const { x, y, w, h } = HP_BAR;
+    const ratio = Phaser.Math.Clamp(this.ctx.playerHp / this.ctx.playerMaxHp, 0, 1);
+    const fw = w * ratio;
+    this.playerHpFill.clear();
+    if (fw > 0) {
+      const r = 160 + Math.floor(70 * ratio);
+      const g = Math.floor(50 * ratio);
+      this.playerHpFill.fillStyle((r << 16) | (g << 8) | 0x20, 1);
+      this.playerHpFill.fillRoundedRect(x, y, fw, h, Math.min(5, fw / 2));
+    }
+    this.playerHpText.setText(
+      `${Math.max(0, Math.ceil(this.ctx.playerHp))} / ${this.ctx.playerMaxHp}`,
+    );
   }
 
   drawMpBar(): void {
-    // MP bar hidden
+    const { x, y, w, h } = MP_BAR;
+    const ratio = Phaser.Math.Clamp(this.ctx.playerMp / this.ctx.playerMaxMp, 0, 1);
+    const fw = w * ratio;
+    this.playerMpFill.clear();
+    if (fw > 0) {
+      this.playerMpFill.fillStyle(0x2266dd, 1);
+      this.playerMpFill.fillRoundedRect(x, y, fw, h, Math.min(4, fw / 2));
+    }
+    this.playerMpText.setText(`${Math.ceil(this.ctx.playerMp)} / ${this.ctx.playerMaxMp}`);
   }
 
   refreshSkillButtonStates(): void {
@@ -413,7 +476,18 @@ export class UIManager {
   }
 
   flashMpBar(): void {
-    // MP bar hidden
+    const { x, y, w, h } = MP_BAR;
+    const flash = this.ctx.add.graphics().setDepth(100);
+    flash.fillStyle(0xff2222, 0.6);
+    flash.fillRoundedRect(x, y, w, h, 4);
+    this.ctx.tweens.add({
+      targets: flash,
+      alpha: 0,
+      duration: 400,
+      yoyo: true,
+      repeat: 1,
+      onComplete: () => flash.destroy(),
+    });
   }
 
   checkLowMpWarning(): void {
@@ -735,18 +809,81 @@ export class UIManager {
   }
 
   createOverdriveGauge(): void {
-    this.overdriveGaugeBg = this.ctx.add.graphics().setDepth(48).setVisible(false);
-    this.overdriveGaugeFill = this.ctx.add.graphics().setDepth(49).setVisible(false);
-    this.overdriveGaugeText = this.ctx.add.text(0, 0, '').setVisible(false).setDepth(50);
-    this.ctx.battleSystem.odReadyText = this.ctx.add.text(0, 0, '').setVisible(false).setDepth(50);
+    const gx = 650,
+      gy = 517,
+      gw = 110,
+      gh = 10;
+    this.overdriveGaugeBg = this.ctx.add.graphics().setDepth(48);
+    this.overdriveGaugeBg.fillStyle(0x111122, 0.7);
+    this.overdriveGaugeBg.fillRoundedRect(gx, gy, gw, gh, 4);
+    this.overdriveGaugeBg.lineStyle(1, 0x554400, 0.5);
+    this.overdriveGaugeBg.strokeRoundedRect(gx, gy, gw, gh, 4);
+    this.overdriveGaugeFill = this.ctx.add.graphics().setDepth(49);
+    this.overdriveGaugeText = this.ctx.add
+      .text(gx + gw / 2, gy - 1, 'OD 0%', {
+        fontSize: '8px',
+        color: '#ffaa00',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 2,
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(50);
+    this.ctx.battleSystem.odReadyText = this.ctx.add
+      .text(gx + gw / 2, gy + gh + 2, '', {
+        fontSize: '10px',
+        color: '#ffdd00',
+        fontFamily: 'Arial',
+        fontStyle: 'bold',
+        stroke: '#000000',
+        strokeThickness: 3,
+      })
+      .setOrigin(0.5, 0)
+      .setDepth(50)
+      .setAlpha(0);
+    const odZone = this.ctx.add
+      .zone(gx + gw / 2, gy + gh / 2, gw, gh + 12)
+      .setInteractive()
+      .setDepth(55);
+    odZone.on('pointerdown', () => this.ctx.battleSystem.tryActivateOverdrive());
+    this.drawOverdriveGauge();
   }
 
   private getOdColor(): number {
+    if (this.ctx.battleSystem.overdriveGauge >= 80) return 0xffcc00;
+    if (this.ctx.battleSystem.overdriveGauge >= 50) return 0xaa44ff;
     return 0x3388ff;
   }
 
   drawOverdriveGauge(): void {
-    // OD gauge hidden
+    if (!this.overdriveGaugeFill || !this.overdriveGaugeText) return;
+    const gx = 650,
+      gy = 517,
+      gw = 110,
+      gh = 10;
+    this.overdriveGaugeFill.clear();
+    const ratio = Phaser.Math.Clamp(this.ctx.battleSystem.overdriveGauge / 100, 0, 1);
+    if (ratio > 0) {
+      this.overdriveGaugeFill.fillStyle(this.getOdColor(), 0.9);
+      this.overdriveGaugeFill.fillRoundedRect(gx, gy, gw * ratio, gh, 4);
+    }
+    if (this.ctx.battleSystem.overdriveActive) {
+      this.overdriveGaugeText.setText('⚡ OVERDRIVE ⚡');
+      this.overdriveGaugeText.setColor('#ffdd00');
+    } else {
+      this.overdriveGaugeText.setText(`OD ${Math.floor(this.ctx.battleSystem.overdriveGauge)}%`);
+      this.overdriveGaugeText.setColor(
+        this.ctx.battleSystem.overdriveGauge >= 80 ? '#ffdd00' : '#ffaa00',
+      );
+    }
+    if (!this.ctx.battleSystem.overdriveActive && this.ctx.battleSystem.odReadyText) {
+      if (this.ctx.battleSystem.overdriveGauge >= 100) {
+        this.ctx.battleSystem.odReadyText.setText('OVERDRIVE! [Enter]').setAlpha(1);
+      } else {
+        this.ctx.battleSystem.odReadyText.setText('').setAlpha(0);
+      }
+    }
   }
 
   createEmergencyDefBtn(): void {
